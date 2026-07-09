@@ -63,7 +63,11 @@ export default function DashboardHome({ stats }) {
   return (
     <div className="space-y-6 animate-fadeIn">
       <div className="mb-8 flex items-center gap-4">
-        <img src="/logo-navy.png" alt="IEUP" className="w-16 h-16" />
+        <img 
+          src="/logo-navy.png" 
+          alt="IEUP" 
+          className="w-16 h-16"
+        />
         <div>
           <h1 className="text-4xl font-bold text-navy mb-2">Dashboard Finanzas</h1>
           <p className="text-gray-600">
@@ -81,7 +85,7 @@ export default function DashboardHome({ stats }) {
         <StatCard icon={TrendingUp} label="Ingresos Totales" amount={stats?.totalIngresos || 0} color="bg-green-100" textColor="text-green-800" />
         <StatCard icon={TrendingDown} label="Egresos Totales" amount={stats?.totalEgresos || 0} color="bg-red-100" textColor="text-red-800" />
         <StatCard icon={Wallet} label="Saldo Actual" amount={stats?.saldo || 0} color="bg-gold bg-opacity-20" textColor="text-oro" />
-        <StatCard icon={Calendar} label="Año" amount={new Date().getFullYear()} color="bg-navy bg-opacity-20" textColor="text-navy" />
+        <StatCard icon={Calendar} label="Año" amount={new Date().getFullYear()} color="bg-navy bg-opacity-20" textColor="text-navy" isYear={true} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -131,8 +135,13 @@ export default function DashboardHome({ stats }) {
   );
 }
 
-function StatCard({ icon: Icon, label, amount, color, textColor }) {
-  const formattedAmount = typeof amount === 'number' ? `$${amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })}` : amount;
+function StatCard({ icon: Icon, label, amount, color, textColor, isYear }) {
+  const formattedAmount = isYear 
+    ? amount 
+    : typeof amount === 'number'
+    ? `$${amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })}`
+    : amount;
+
   return (
     <div className={`${color} rounded-lg p-6 ${textColor}`}>
       <div className="flex items-center justify-between">
