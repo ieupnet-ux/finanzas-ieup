@@ -2,6 +2,7 @@
 ## Sistema Profesional de Gestión de Finanzas
 ### Iglesia Evangélica Unión Pentecostal
 
+
 ---
 
 ## 🎯 Características Principales
