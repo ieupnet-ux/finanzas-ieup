@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { Download, Plus, Settings, Edit2, Trash2, X } from 'lucide-react';
+import { Download, Plus, Settings, Edit2, Trash2, X, Upload } from 'lucide-react';
 import Papa from 'papaparse';
 
-export default function Egresos() {
-  const [egresos, setEgresos] = useState([]);
+export default function Ingresos() {
+  const [ingresos, setIngresos] = useState([]);
   const [conceptos, setConceptos] = useState([]);
   const [templos, setTemplos] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [newConcept, setNewConcept] = useState('');
+  const [importMessage, setImportMessage] = useState('');
+  const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     monto: '',
     concepto: '',
@@ -67,14 +69,14 @@ export default function Egresos() {
   }, []);
 
   const loadData = async () => {
-    const { data: egr } = await supabase.from('movimientos').select('*').eq('tipo', 'egreso');
-    setEgresos(egr || []);
-
-    const { data: conceptosData } = await supabase.from('conceptos').select('*').eq('tipo', 'egreso');
-    setConceptos(conceptosData || []);
+    const { data: ing } = await supabase.from('movimientos').select('*').eq('tipo', 'ingreso');
+    setIngresos(ing || []);
 
     const { data: temp } = await supabase.from('templos').select('*');
     setTemplos(temp || []);
+
+    const { data: conceptosData } = await supabase.from('conceptos').select('*');
+    setConceptos(conceptosData || []);
   };
 
   const handleAddConcept = async () => {
@@ -82,14 +84,14 @@ export default function Egresos() {
     
     await supabase.from('conceptos').insert({
       nombre: newConcept,
-      tipo: 'egreso'
+      tipo: 'ingreso'
     });
     
     setNewConcept('');
     loadData();
   };
 
-  const handleAddEgreso = async (e) => {
+  const handleAddIngreso = async (e) => {
     e.preventDefault();
     
     if (editingId) {
@@ -114,7 +116,7 @@ export default function Egresos() {
         tipo_transaccion: formData.tipo_transaccion,
         ubicacion: formData.ubicacion,
         detalle: formData.detalle,
-        tipo: 'egreso',
+        tipo: 'ingreso',
         fecha: formData.fecha
       });
     }
@@ -128,46 +130,115 @@ export default function Egresos() {
     loadData();
   };
 
-  const handleEditEgreso = (egreso) => {
+  const handleEditIngreso = (ingreso) => {
     setFormData({
-      monto: egreso.monto,
-      concepto: egreso.concepto,
-      templo: egreso.templo_id || '',
-      moneda: egreso.moneda || 'ARS',
-      tipo_transaccion: egreso.tipo_transaccion || 'efectivo',
-      ubicacion: egreso.ubicacion || 'general',
-      detalle: egreso.detalle || '',
-      fecha: egreso.fecha.split('T')[0]
+      monto: ingreso.monto,
+      concepto: ingreso.concepto,
+      templo: ingreso.templo_id || '',
+      moneda: ingreso.moneda || 'ARS',
+      tipo_transaccion: ingreso.tipo_transaccion || 'efectivo',
+      ubicacion: ingreso.ubicacion || 'general',
+      detalle: ingreso.detalle || '',
+      fecha: ingreso.fecha.split('T')[0]
     });
-    setEditingId(egreso.id);
+    setEditingId(ingreso.id);
     setShowForm(true);
   };
 
-  const handleDeleteEgreso = async (id) => {
-    if (confirm('¿Eliminar este egreso? La acción quedará registrada en auditoría.')) {
+  const handleDeleteIngreso = async (id) => {
+    if (confirm('¿Eliminar este ingreso? La acción quedará registrada en auditoría.')) {
       await supabase.from('movimientos').delete().eq('id', id);
       loadData();
     }
   };
 
   const handleExportCSV = () => {
-    const data = egresos.map(e => ({
-      Fecha: new Date(e.fecha).toLocaleDateString('es-ES'),
-      Concepto: e.concepto,
-      Monto: e.monto,
-      Moneda: e.moneda || 'ARS',
-      Tipo: tiposTransaccion.find(t => t.value === e.tipo_transaccion)?.label || '—',
-      Ubicación: ubicaciones.find(u => u.value === e.ubicacion)?.label || '—',
-      Templo: e.templo_id ? templos.find(t => t.id === e.templo_id)?.nombre || '—' : '—',
-      Detalle: e.detalle || '—'
+    const data = ingresos.map(ing => ({
+      Fecha: new Date(ing.fecha).toLocaleDateString('es-ES'),
+      Concepto: ing.concepto,
+      Monto: ing.monto,
+      Moneda: ing.moneda || 'ARS',
+      Tipo: tiposTransaccion.find(t => t.value === ing.tipo_transaccion)?.label || '—',
+      Ubicación: ubicaciones.find(u => u.value === ing.ubicacion)?.label || '—',
+      Detalle: ing.detalle || '—',
+      Templo: ing.templo_id || '—'
     }));
 
     const csv = Papa.unparse(data);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `egresos-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `ingresos-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
+  };
+
+  const handleImportCSV = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const registrosValidos = [];
+          let errores = [];
+
+          for (let i = 0; i < results.data.length; i++) {
+            const row = results.data[i];
+            
+            // Validar campos requeridos
+            if (!row.Monto || !row.Concepto || !row.Fecha) {
+              errores.push(`Fila ${i + 2}: Faltan campos (Monto, Concepto o Fecha)`);
+              continue;
+            }
+
+            // Parsear fecha (DD/MM/YYYY → YYYY-MM-DD)
+            let fechaParsed = row.Fecha;
+            if (row.Fecha.includes('/')) {
+              const [dia, mes, año] = row.Fecha.split('/');
+              fechaParsed = `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+            }
+
+            registrosValidos.push({
+              monto: parseFloat(row.Monto),
+              concepto: row.Concepto.trim(),
+              moneda: row.Moneda?.trim() || 'ARS',
+              tipo_transaccion: 'efectivo', // Por defecto
+              ubicacion: 'general', // Por defecto
+              detalle: row.Detalle?.trim() || null,
+              templo_id: row.Templo?.trim() || null,
+              tipo: 'ingreso',
+              fecha: fechaParsed
+            });
+          }
+
+          if (registrosValidos.length === 0) {
+            setImportMessage(`❌ Error: No hay registros válidos. ${errores.join(' | ')}`);
+            return;
+          }
+
+          // Insertar en Supabase
+          const { error } = await supabase.from('movimientos').insert(registrosValidos);
+
+          if (error) {
+            setImportMessage(`❌ Error al guardar: ${error.message}`);
+          } else {
+            setImportMessage(`✅ Importado: ${registrosValidos.length} ingresos guardados ${errores.length > 0 ? `(${errores.length} con errores)` : ''}`);
+            loadData();
+            setTimeout(() => setImportMessage(''), 5000);
+          }
+        } catch (err) {
+          setImportMessage(`❌ Error: ${err.message}`);
+        }
+      },
+      error: (error) => {
+        setImportMessage(`❌ Error al leer CSV: ${error.message}`);
+      }
+    });
+
+    // Limpiar input
+    e.target.value = '';
   };
 
   const getMonedaSymbol = (moneda) => {
@@ -179,8 +250,8 @@ export default function Egresos() {
     <div className="space-y-6">
       <div className="mb-8 flex justify-between items-center">
         <div>
-          <h1 className="text-4xl font-bold text-navy mb-2">Egresos</h1>
-          <p className="text-gray-600">Registro y gestión de egresos en múltiples monedas y ubicaciones</p>
+          <h1 className="text-4xl font-bold text-navy mb-2">Ingresos</h1>
+          <p className="text-gray-600">Registro y gestión de ingresos en múltiples monedas y ubicaciones</p>
         </div>
         <div className="flex gap-3 flex-wrap">
           <button
@@ -190,6 +261,20 @@ export default function Egresos() {
             <Download size={20} />
             Exportar CSV
           </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <Upload size={20} />
+            Importar CSV
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleImportCSV}
+            className="hidden"
+          />
           <button
             onClick={() => setShowSettings(!showSettings)}
             className="btn-secondary flex items-center gap-2"
@@ -210,15 +295,22 @@ export default function Egresos() {
             className="btn-primary flex items-center gap-2"
           >
             <Plus size={20} />
-            Nuevo Egreso
+            Nuevo Ingreso
           </button>
         </div>
       </div>
 
+      {/* Mensaje de importación */}
+      {importMessage && (
+        <div className={`card ${importMessage.includes('✅') ? 'bg-green-50 border-l-4 border-green-500' : 'bg-red-50 border-l-4 border-red-500'}`}>
+          <p className={importMessage.includes('✅') ? 'text-green-800' : 'text-red-800'}>{importMessage}</p>
+        </div>
+      )}
+
       {/* Panel de configuración de conceptos */}
       {showSettings && (
-        <div className="card bg-red-50 border-l-4 border-red-500">
-          <h2 className="text-xl font-bold text-navy mb-4">Administrar Conceptos de Egresos</h2>
+        <div className="card bg-blue-50 border-l-4 border-blue-500">
+          <h2 className="text-xl font-bold text-navy mb-4">Administrar Conceptos de Ingresos</h2>
           <div className="space-y-3">
             <div className="flex gap-2">
               <input
@@ -233,8 +325,8 @@ export default function Egresos() {
               </button>
             </div>
             <div className="flex flex-wrap gap-2">
-              {conceptos.filter(c => c.tipo === 'egreso').map((c) => (
-                <span key={c.id} className="bg-red-200 text-red-800 px-3 py-1 rounded">
+              {conceptos.filter(c => c.tipo === 'ingreso').map((c) => (
+                <span key={c.id} className="bg-blue-200 text-blue-800 px-3 py-1 rounded">
                   {c.nombre}
                 </span>
               ))}
@@ -243,11 +335,11 @@ export default function Egresos() {
         </div>
       )}
 
-      {/* Formulario para nuevo egreso */}
+      {/* Formulario para nuevo ingreso */}
       {showForm && (
-        <form onSubmit={handleAddEgreso} className="card bg-red-50 border-l-4 border-red-500">
+        <form onSubmit={handleAddIngreso} className="card bg-green-50 border-l-4 border-green-500">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-navy">{editingId ? 'Editar Egreso' : 'Registrar Nuevo Egreso'}</h2>
+            <h2 className="text-xl font-bold text-navy">{editingId ? 'Editar Ingreso' : 'Registrar Nuevo Ingreso'}</h2>
             <button
               type="button"
               onClick={() => {
@@ -276,7 +368,7 @@ export default function Egresos() {
               required
             >
               <option value="">Selecciona concepto</option>
-              {conceptos.filter(c => c.tipo === 'egreso').map((c) => (
+              {conceptos.filter(c => c.tipo === 'ingreso').map((c) => (
                 <option key={c.id} value={c.nombre}>{c.nombre}</option>
               ))}
             </select>
@@ -345,14 +437,14 @@ export default function Egresos() {
           </div>
 
           <button type="submit" className="btn-primary mt-4 w-full">
-            {editingId ? 'Actualizar Egreso' : 'Guardar Egreso'}
+            {editingId ? 'Actualizar Ingreso' : 'Guardar Ingreso'}
           </button>
         </form>
       )}
 
-      {/* Tabla de egresos */}
+      {/* Tabla de ingresos */}
       <div className="card">
-        <h2 className="text-xl font-bold text-navy mb-4">Últimos Egresos</h2>
+        <h2 className="text-xl font-bold text-navy mb-4">Últimos Ingresos</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -363,43 +455,41 @@ export default function Egresos() {
                 <th className="text-left p-3 text-navy font-bold">Moneda</th>
                 <th className="text-left p-3 text-navy font-bold">Tipo</th>
                 <th className="text-left p-3 text-navy font-bold">Ubicación</th>
-                <th className="text-left p-3 text-navy font-bold">Templo</th>
                 <th className="text-left p-3 text-navy font-bold">Detalle</th>
                 <th className="text-left p-3 text-navy font-bold">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {egresos.length > 0 ? (
-                egresos.slice(0, 50).map((egr, idx) => (
+              {ingresos.length > 0 ? (
+                ingresos.slice(0, 50).map((ing, idx) => (
                   <tr key={idx} className="border-b hover:bg-gray-50">
-                    <td className="p-3">{new Date(egr.fecha).toLocaleDateString('es-ES')}</td>
-                    <td className="p-3 font-medium">{egr.concepto}</td>
-                    <td className="p-3 font-bold text-red-600">{getMonedaSymbol(egr.moneda)} {egr.monto?.toLocaleString()}</td>
+                    <td className="p-3">{new Date(ing.fecha).toLocaleDateString('es-ES')}</td>
+                    <td className="p-3 font-medium">{ing.concepto}</td>
+                    <td className="p-3 font-bold text-green-600">{getMonedaSymbol(ing.moneda)} {ing.monto?.toLocaleString()}</td>
                     <td className="p-3">
                       <span className="font-semibold">
-                        {egr.moneda === 'ARS' && '🇦🇷 ARS'}
-                        {egr.moneda === 'USD' && '🇺🇸 USD'}
-                        {egr.moneda === 'CLP' && '🇨🇱 CLP'}
+                        {ing.moneda === 'ARS' && '🇦🇷 ARS'}
+                        {ing.moneda === 'USD' && '🇺🇸 USD'}
+                        {ing.moneda === 'CLP' && '🇨🇱 CLP'}
                       </span>
                     </td>
                     <td className="p-3">
-                      <span className="px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-800">
-                        {tiposTransaccion.find(t => t.value === egr.tipo_transaccion)?.label || '—'}
+                      <span className="px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-800">
+                        {tiposTransaccion.find(t => t.value === ing.tipo_transaccion)?.label || '—'}
                       </span>
                     </td>
-                    <td className="p-3 text-xs">{ubicaciones.find(u => u.value === egr.ubicacion)?.label || '—'}</td>
-                    <td className="p-3 text-xs">{egr.templo_id ? templos.find(t => t.id === egr.templo_id)?.nombre || '—' : '—'}</td>
-                    <td className="p-3 text-gray-600">{egr.detalle || '—'}</td>
+                    <td className="p-3 text-xs">{ubicaciones.find(u => u.value === ing.ubicacion)?.label || '—'}</td>
+                    <td className="p-3 text-gray-600">{ing.detalle || '—'}</td>
                     <td className="p-3 flex gap-2">
                       <button
-                        onClick={() => handleEditEgreso(egr)}
+                        onClick={() => handleEditIngreso(ing)}
                         className="text-blue-600 hover:text-blue-800"
                         title="Editar"
                       >
                         <Edit2 size={18} />
                       </button>
                       <button
-                        onClick={() => handleDeleteEgreso(egr.id)}
+                        onClick={() => handleDeleteIngreso(ing.id)}
                         className="text-red-600 hover:text-red-800"
                         title="Eliminar"
                       >
@@ -410,8 +500,8 @@ export default function Egresos() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="9" className="p-6 text-center text-gray-500">
-                    No hay egresos registrados
+                  <td colSpan="8" className="p-6 text-center text-gray-500">
+                    No hay ingresos registrados
                   </td>
                 </tr>
               )}
