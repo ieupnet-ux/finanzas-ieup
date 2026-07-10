@@ -185,6 +185,23 @@ export default function Egresos() {
           const { data: templosData } = await supabase.from('templos').select('*');
           const templosActuales = templosData || [];
 
+          // Parsear montos en formato argentino: 5.000,00 → 5000.00
+          const parseMonto = (valor) => {
+            if (typeof valor === 'number') return valor;
+            let s = String(valor).trim().replace(/[$\s]/g, '');
+            if (s.includes(',')) {
+              // Coma presente = separador decimal; puntos = miles
+              s = s.replace(/\./g, '').replace(',', '.');
+            } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+              // Solo puntos agrupando de a 3 = separadores de miles (5.000 → 5000)
+              s = s.replace(/\./g, '');
+            }
+            return parseFloat(s);
+          };
+
+          // Quitar emoji inicial de las etiquetas para comparar por nombre
+          const limpiarLabel = (label) => label.replace(/^[^\wáéíóúñÁÉÍÓÚÑ]+/, '').trim().toLowerCase();
+
           const registrosValidos = [];
           let errores = [];
 
@@ -194,6 +211,13 @@ export default function Egresos() {
             // Validar campos requeridos
             if (!row.Monto || !row.Concepto || !row.Fecha) {
               errores.push(`Fila ${i + 2}: Faltan campos (Monto, Concepto o Fecha)`);
+              continue;
+            }
+
+            // Parsear monto (acepta 5000, 5000.50, 5.000,00, $5.000)
+            const montoParsed = parseMonto(row.Monto);
+            if (isNaN(montoParsed) || montoParsed <= 0) {
+              errores.push(`Fila ${i + 2}: Monto inválido "${row.Monto}"`);
               continue;
             }
 
@@ -216,12 +240,42 @@ export default function Egresos() {
               }
             }
 
+            // BUSCAR ubicación/caja por nombre (columna "Ubicacion", "Ubicación" o "Caja")
+            let ubicacionValue = 'general';
+            const ubicacionCSV = (row.Ubicacion || row['Ubicación'] || row.Caja || '').trim();
+            if (ubicacionCSV) {
+              const ubicEncontrada = ubicaciones.find(u =>
+                u.value === ubicacionCSV.toLowerCase() ||
+                limpiarLabel(u.label) === ubicacionCSV.toLowerCase()
+              );
+              if (ubicEncontrada) {
+                ubicacionValue = ubicEncontrada.value;
+              } else {
+                errores.push(`Fila ${i + 2}: Caja/Ubicación "${ubicacionCSV}" no reconocida, se usó General`);
+              }
+            }
+
+            // BUSCAR tipo de transacción por nombre (columna "Tipo")
+            let tipoTransValue = 'efectivo';
+            const tipoCSV = (row.Tipo || '').trim();
+            if (tipoCSV) {
+              const tipoEncontrado = tiposTransaccion.find(t =>
+                t.value === tipoCSV.toLowerCase() ||
+                limpiarLabel(t.label) === tipoCSV.toLowerCase()
+              );
+              if (tipoEncontrado) {
+                tipoTransValue = tipoEncontrado.value;
+              } else {
+                errores.push(`Fila ${i + 2}: Tipo "${tipoCSV}" no reconocido, se usó Efectivo`);
+              }
+            }
+
             registrosValidos.push({
-              monto: parseFloat(row.Monto),
+              monto: montoParsed,
               concepto: row.Concepto.trim(),
-              moneda: row.Moneda?.trim() || 'ARS',
-              tipo_transaccion: 'efectivo',
-              ubicacion: 'general',
+              moneda: row.Moneda?.trim().toUpperCase() || 'ARS',
+              tipo_transaccion: tipoTransValue,
+              ubicacion: ubicacionValue,
               detalle: row.Detalle?.trim() || null,
               templo_id: templo_id,
               tipo: 'egreso',
