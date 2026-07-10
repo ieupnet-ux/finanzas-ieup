@@ -1,199 +1,345 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
-import { Wallet } from 'lucide-react';
+import { Wallet, Landmark, Smartphone, Filter, PiggyBank } from 'lucide-react';
+
+const SYMBOLS = { ARS: '$', USD: 'U$S', CLP: 'CLP $' };
+const COLORS = ['#FFD700', '#C41E3A', '#001f3f', '#D4AF37', '#22c55e', '#3b82f6', '#a855f7', '#f97316', '#14b8a6', '#ec4899'];
+
+const GRUPOS = {
+  cajas: {
+    titulo: 'Cajas',
+    icon: Wallet,
+    items: ['adolescentes', 'ciclistas', 'coro', 'coro-juvenil', 'dorcas', 'general', 'jovenes', 'ninos', 'porteras', 'porteros', 'emisora', 'cajas', 'reposteria', 'secretaria'],
+  },
+  bancos: {
+    titulo: 'Bancos',
+    icon: Landmark,
+    items: ['banco-nacion', 'banco-macro'],
+  },
+  otros: {
+    titulo: 'Billeteras y Otros',
+    icon: Smartphone,
+    items: ['plazo-fijo', 'mercado-pago', 'billetera-virtual', 'otro'],
+  },
+};
+
+const LABELS = {
+  'adolescentes': 'Adolescentes', 'ciclistas': 'Ciclistas', 'coro': 'Coro',
+  'coro-juvenil': 'Coro Juvenil', 'dorcas': 'Dorcas', 'general': 'General',
+  'jovenes': 'Jóvenes', 'ninos': 'Niños', 'porteras': 'Porteras',
+  'porteros': 'Porteros', 'emisora': 'Emisora', 'cajas': 'Cajas',
+  'reposteria': 'Repostería', 'secretaria': 'Secretaría',
+  'banco-nacion': 'Banco Nación', 'banco-macro': 'Banco Macro',
+  'plazo-fijo': 'Plazo Fijo', 'mercado-pago': 'Mercado Pago',
+  'billetera-virtual': 'Billetera Virtual', 'otro': 'Otro',
+};
+
+const PERIODOS = [
+  { value: 'todo', label: 'Todo (saldo histórico)' },
+  { value: 'este-mes', label: 'Este mes' },
+  { value: 'mes-anterior', label: 'Mes anterior' },
+  { value: 'ultimos-3-meses', label: 'Últimos 3 meses' },
+  { value: 'este-anio', label: 'Este año' },
+  { value: 'personalizado', label: 'Personalizado' },
+];
+
+function rangoPeriodo(periodo, desde, hasta) {
+  const hoy = new Date();
+  const inicioDia = (d) => { d.setHours(0, 0, 0, 0); return d; };
+  const finDia = (d) => { d.setHours(23, 59, 59, 999); return d; };
+  switch (periodo) {
+    case 'este-mes':
+      return [inicioDia(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), finDia(new Date(hoy))];
+    case 'mes-anterior':
+      return [inicioDia(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)), finDia(new Date(hoy.getFullYear(), hoy.getMonth(), 0))];
+    case 'ultimos-3-meses':
+      return [inicioDia(new Date(hoy.getFullYear(), hoy.getMonth() - 2, 1)), finDia(new Date(hoy))];
+    case 'este-anio':
+      return [inicioDia(new Date(hoy.getFullYear(), 0, 1)), finDia(new Date(hoy))];
+    case 'personalizado':
+      return [
+        desde ? inicioDia(new Date(desde + 'T00:00:00')) : new Date(2000, 0, 1),
+        hasta ? finDia(new Date(hasta + 'T00:00:00')) : finDia(new Date(hoy)),
+      ];
+    default:
+      return [new Date(2000, 0, 1), finDia(new Date(hoy))];
+  }
+}
 
 export default function Finanzas() {
-  const [saldos, setSaldos] = useState([]);
   const [movimientos, setMovimientos] = useState([]);
-  const [monedaSeleccionada, setMonedaSeleccionada] = useState('ARS');
-  const [filtroFecha, setFiltroFecha] = useState('mes');
+  const [templos, setTemplos] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadFinanzas();
-  }, [filtroFecha]);
+  const [moneda, setMoneda] = useState('ARS');
+  const [periodo, setPeriodo] = useState('todo');
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+  const [temploFiltro, setTemploFiltro] = useState('');
 
-  const loadFinanzas = async () => {
+  useEffect(() => { loadData(); }, []);
+
+  const loadData = async () => {
     try {
-      const { data: movs } = await supabase
-        .from('movimientos')
-        .select('*')
-        .order('fecha', { ascending: false });
-
-      setMovimientos(movs || []);
-      calcularSaldos(movs || []);
-    } catch (error) {
-      console.error('Error loading finanzas:', error);
+      const [movRes, tempRes] = await Promise.all([
+        supabase.from('movimientos').select('*'),
+        supabase.from('templos').select('*'),
+      ]);
+      setMovimientos(movRes.data || []);
+      setTemplos(tempRes.data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const calcularSaldos = (movs) => {
-    const saldosPorMoneda = {};
+  const monedasDisponibles = useMemo(() => {
+    const set = new Set(movimientos.map(m => m.moneda || 'ARS'));
+    return ['ARS', 'USD', 'CLP'].filter(m => set.has(m));
+  }, [movimientos]);
 
-    movs.forEach((mov) => {
-      if (!saldosPorMoneda[mov.moneda]) {
-        saldosPorMoneda[mov.moneda] = {
-          moneda: mov.moneda,
-          ingresos: 0,
-          egresos: 0,
-        };
-      }
-
-      if (mov.tipo === 'ingreso') {
-        saldosPorMoneda[mov.moneda].ingresos += mov.monto;
-      } else {
-        saldosPorMoneda[mov.moneda].egresos += mov.monto;
-      }
+  const movsFiltrados = useMemo(() => {
+    const [ini, fin] = rangoPeriodo(periodo, desde, hasta);
+    return movimientos.filter(m => {
+      if ((m.moneda || 'ARS') !== moneda) return false;
+      const f = new Date(m.fecha);
+      if (f < ini || f > fin) return false;
+      if (temploFiltro && m.templo_id !== temploFiltro) return false;
+      return true;
     });
+  }, [movimientos, moneda, periodo, desde, hasta, temploFiltro]);
 
-    setSaldos(
-      Object.values(saldosPorMoneda).map((s) => ({
-        ...s,
-        saldo: s.ingresos - s.egresos,
-      }))
-    );
+  // Saldos por ubicación
+  const saldos = useMemo(() => {
+    const porUbicacion = {};
+    movsFiltrados.forEach(m => {
+      const u = m.ubicacion || 'general';
+      if (!porUbicacion[u]) porUbicacion[u] = { ingresos: 0, egresos: 0 };
+      if (m.tipo === 'ingreso') porUbicacion[u].ingresos += m.monto || 0;
+      else porUbicacion[u].egresos += m.monto || 0;
+    });
+    return porUbicacion;
+  }, [movsFiltrados]);
+
+  const saldoDe = (u) => {
+    const s = saldos[u];
+    return s ? s.ingresos - s.egresos : 0;
   };
 
-  const monedaSeleccionadaData = movimientos.filter((m) => m.moneda === monedaSeleccionada);
+  const totalGrupo = (grupo) =>
+    GRUPOS[grupo].items.reduce((sum, u) => sum + saldoDe(u), 0);
 
-  // Gráfico por día
-  const chartData = {};
-  monedaSeleccionadaData.forEach((mov) => {
-    const fecha = mov.fecha.split('T')[0];
-    if (!chartData[fecha]) {
-      chartData[fecha] = { fecha, ingresos: 0, egresos: 0 };
-    }
-    if (mov.tipo === 'ingreso') {
-      chartData[fecha].ingresos += mov.monto;
-    } else {
-      chartData[fecha].egresos += mov.monto;
-    }
-  });
+  const saldoTotal = Object.keys(GRUPOS).reduce((sum, g) => sum + totalGrupo(g), 0);
+
+  // Datos para gráfico de composición del saldo (solo positivos)
+  const composicion = useMemo(() => {
+    return Object.entries(saldos)
+      .map(([u, s]) => ({ name: LABELS[u] || u, value: s.ingresos - s.egresos }))
+      .filter(x => x.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [saldos]);
+
+  // Movimiento del período por grupo (ingresos/egresos)
+  const flujoGrupos = useMemo(() => {
+    return Object.entries(GRUPOS).map(([key, g]) => {
+      let ingresos = 0, egresos = 0;
+      g.items.forEach(u => {
+        if (saldos[u]) {
+          ingresos += saldos[u].ingresos;
+          egresos += saldos[u].egresos;
+        }
+      });
+      return { grupo: g.titulo, ingresos, egresos };
+    });
+  }, [saldos]);
+
+  const fmt = (n) =>
+    `${SYMBOLS[moneda] || '$'} ${(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmtCompacto = (n) => {
+    if (Math.abs(n) >= 1000000) return `${(n / 1000000).toLocaleString('es-AR', { maximumFractionDigits: 1 })}M`;
+    if (Math.abs(n) >= 1000) return `${(n / 1000).toLocaleString('es-AR', { maximumFractionDigits: 0 })}k`;
+    return n.toString();
+  };
 
   return (
-    <div className="space-y-6 animate-fadeIn">
-      <h1 className="text-3xl font-bold text-navy">Finanzas</h1>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-bold text-navy mb-2">Finanzas</h1>
+          <p className="text-gray-600">Estado de cajas, bancos y billeteras</p>
+        </div>
+        {monedasDisponibles.length > 1 && (
+          <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+            {monedasDisponibles.map((m) => (
+              <button
+                key={m}
+                onClick={() => setMoneda(m)}
+                className={`px-4 py-2 rounded-md text-sm font-bold transition ${moneda === m ? 'bg-navy text-white shadow' : 'text-navy hover:bg-gray-200'}`}
+              >
+                {m === 'ARS' && '🇦🇷 ARS'}
+                {m === 'USD' && '🇺🇸 USD'}
+                {m === 'CLP' && '🇨🇱 CLP'}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* Saldos por Moneda */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {saldos.map((saldo) => (
-          <div
-            key={saldo.moneda}
-            className={`card cursor-pointer transition-all ${
-              monedaSeleccionada === saldo.moneda
-                ? 'ring-2 ring-gold'
-                : 'hover:shadow-lg'
-            }`}
-            onClick={() => setMonedaSeleccionada(saldo.moneda)}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-sm text-gray-600 font-medium">
-                  <Wallet className="inline mr-2" size={16} />
-                  {saldo.moneda}
-                </p>
-              </div>
+      {/* FILTROS */}
+      <div className="card bg-blue-50 border-l-4 border-blue-500">
+        <h2 className="text-lg font-bold text-navy mb-3 flex items-center gap-2">
+          <Filter size={20} /> Filtros
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-navy mb-1">Período</label>
+            <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="input-field w-full">
+              {PERIODOS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-navy mb-1">Templo</label>
+            <select value={temploFiltro} onChange={(e) => setTemploFiltro(e.target.value)} className="input-field w-full">
+              <option value="">Todos los templos</option>
+              {templos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() => { setPeriodo('todo'); setDesde(''); setHasta(''); setTemploFiltro(''); }}
+              className="btn-secondary w-full"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        </div>
+        {periodo === 'personalizado' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+            <div>
+              <label className="block text-xs font-bold text-navy mb-1">Desde</label>
+              <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="input-field w-full" />
             </div>
-
-            <div className="space-y-2">
-              <div>
-                <p className="text-xs text-gray-600">Ingresos</p>
-                <p className="text-lg font-bold text-green-600">
-                  ${saldo.ingresos.toLocaleString('es-ES')}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Egresos</p>
-                <p className="text-lg font-bold text-red-600">
-                  ${saldo.egresos.toLocaleString('es-ES')}
-                </p>
-              </div>
-              <div className="border-t pt-2 mt-2">
-                <p className="text-xs text-gray-600">Saldo</p>
-                <p className={`text-2xl font-bold ${saldo.saldo >= 0 ? 'text-gold' : 'text-red-600'}`}>
-                  ${saldo.saldo.toLocaleString('es-ES')}
-                </p>
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-navy mb-1">Hasta</label>
+              <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="input-field w-full" />
             </div>
           </div>
-        ))}
+        )}
+        <p className="text-xs text-gray-600 mt-3">
+          💡 Con el período "Todo" ves el <strong>saldo real acumulado</strong> de cada caja. Con otros períodos ves solo el movimiento de ese lapso.
+        </p>
       </div>
 
-      {/* Gráfico */}
-      <div className="card">
-        <h2 className="text-xl font-bold text-navy mb-4">
-          Movimientos - {monedaSeleccionada}
-        </h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={Object.values(chartData)}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="fecha" stroke="#666" />
-            <YAxis stroke="#666" />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#fff',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-              }}
-            />
-            <Legend />
-            <Bar dataKey="ingresos" fill="#22c55e" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="egresos" fill="#ef4444" radius={[8, 8, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Detalle de Movimientos */}
-      <div className="card">
-        <h2 className="text-xl font-bold text-navy mb-4">
-          Movimientos Detallados - {monedaSeleccionada}
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="table-head">
-              <tr>
-                <th className="px-4 py-3 text-left">Fecha</th>
-                <th className="px-4 py-3 text-left">Tipo</th>
-                <th className="px-4 py-3 text-left">Concepto</th>
-                <th className="px-4 py-3 text-right">Monto</th>
-                <th className="px-4 py-3 text-left">Observaciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {monedaSeleccionadaData.slice(0, 20).map((mov) => (
-                <tr key={mov.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm">
-                    {new Date(mov.fecha).toLocaleDateString('es-ES')}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <span
-                      className={`px-2 py-1 rounded text-white text-xs font-semibold ${
-                        mov.tipo === 'ingreso' ? 'bg-green-600' : 'bg-red-600'
-                      }`}
-                    >
-                      {mov.tipo === 'ingreso' ? '+' : '-'} {mov.tipo}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm font-medium">{mov.concepto}</td>
-                  <td className="px-4 py-3 text-sm text-right font-semibold">
-                    ${mov.monto.toLocaleString('es-ES')}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{mov.observaciones}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* SALDO TOTAL */}
+      <div className="card bg-gold bg-opacity-20 border-l-4 border-gold">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-oro opacity-75">SALDO TOTAL ({moneda})</p>
+            <p className={`text-4xl font-bold mt-1 ${saldoTotal >= 0 ? 'text-oro' : 'text-red-600'}`}>{fmt(saldoTotal)}</p>
+          </div>
+          <PiggyBank size={48} className="text-oro opacity-50" />
         </div>
       </div>
+
+      {loading ? (
+        <div className="card text-center text-gray-500 py-12">Cargando datos...</div>
+      ) : (
+        <>
+          {/* GRUPOS: CAJAS / BANCOS / OTROS */}
+          {Object.entries(GRUPOS).map(([key, grupo]) => {
+            const Icon = grupo.icon;
+            const itemsConMovimiento = grupo.items.filter(u => saldos[u]);
+            return (
+              <div key={key} className="card">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold text-navy flex items-center gap-2">
+                    <Icon size={22} /> {grupo.titulo}
+                  </h2>
+                  <span className={`text-xl font-bold ${totalGrupo(key) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                    {fmt(totalGrupo(key))}
+                  </span>
+                </div>
+                {itemsConMovimiento.length === 0 ? (
+                  <p className="text-gray-500 text-sm">Sin movimientos en el período</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b-2 border-gold">
+                          <th className="text-left p-3 text-navy font-bold">Nombre</th>
+                          <th className="text-right p-3 text-navy font-bold">Ingresos</th>
+                          <th className="text-right p-3 text-navy font-bold">Egresos</th>
+                          <th className="text-right p-3 text-navy font-bold">Saldo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {itemsConMovimiento
+                          .sort((a, b) => saldoDe(b) - saldoDe(a))
+                          .map(u => (
+                            <tr key={u} className="border-b hover:bg-gray-50">
+                              <td className="p-3 font-medium">{LABELS[u] || u}</td>
+                              <td className="p-3 text-right text-green-700">{fmt(saldos[u].ingresos)}</td>
+                              <td className="p-3 text-right text-red-600">{fmt(saldos[u].egresos)}</td>
+                              <td className={`p-3 text-right font-bold ${saldoDe(u) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                {fmt(saldoDe(u))}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* GRÁFICOS */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="card">
+              <h2 className="text-xl font-bold text-navy mb-4">Composición del Saldo</h2>
+              {composicion.length === 0 ? (
+                <p className="text-gray-500 text-center py-12">Sin saldos positivos</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={composicion} cx="50%" cy="50%" outerRadius={90}
+                      dataKey="value" nameKey="name"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      labelLine={{ strokeWidth: 1 }}
+                    >
+                      {composicion.map((entry, index) => (
+                        <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => fmt(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            <div className="card">
+              <h2 className="text-xl font-bold text-navy mb-4">Flujo por Grupo</h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={flujoGrupos} margin={{ left: 10, right: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="grupo" tick={{ fontSize: 12 }} />
+                  <YAxis tickFormatter={fmtCompacto} tick={{ fontSize: 12 }} width={55} />
+                  <Tooltip formatter={(v) => fmt(v)} />
+                  <Legend />
+                  <Bar dataKey="ingresos" fill="#22c55e" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="egresos" fill="#ef4444" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
