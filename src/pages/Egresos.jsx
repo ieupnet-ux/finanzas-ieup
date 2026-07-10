@@ -15,10 +15,39 @@ export default function Egresos() {
     monto: '',
     concepto: '',
     centro_costos: '',
-    tipo: 'efectivo',
+    moneda: 'ARS',
+    tipo_transaccion: 'efectivo',
+    ubicacion: 'caja-general',
     detalle: '',
     fecha: new Date().toISOString().split('T')[0]
   });
+
+  const monedas = [
+    { code: 'ARS', label: '🇦🇷 Pesos Argentinos' },
+    { code: 'USD', label: '🇺🇸 Dólares' },
+    { code: 'CLP', label: '🇨🇱 Pesos Chilenos' }
+  ];
+
+  const tiposTransaccion = [
+    { value: 'efectivo', label: '💵 Efectivo' },
+    { value: 'deposito', label: '🏦 Depósito Bancario' },
+    { value: 'extraccion', label: '💸 Extracción Bancaria' },
+    { value: 'plazo-fijo', label: '📅 Plazo Fijo' },
+    { value: 'billetera-virtual', label: '📱 Billetera Virtual' }
+  ];
+
+  const ubicaciones = [
+    { value: 'caja-general', label: '💼 Caja General' },
+    { value: 'caja-jovenes', label: '👥 Caja Jóvenes' },
+    { value: 'caja-dorcas', label: '👵 Caja Dorcas' },
+    { value: 'banco-nacion', label: '🏦 Banco Nación' },
+    { value: 'banco-santander', label: '🏦 Banco Santander' },
+    { value: 'banco-icbc', label: '🏦 Banco ICBC' },
+    { value: 'plazo-fijo', label: '📅 Plazo Fijo' },
+    { value: 'mercado-pago', label: '📱 Mercado Pago' },
+    { value: 'billetera-virtual', label: '📱 Billetera Virtual' },
+    { value: 'otro', label: '❓ Otro' }
+  ];
 
   useEffect(() => {
     loadData();
@@ -55,7 +84,9 @@ export default function Egresos() {
         monto: parseFloat(formData.monto),
         concepto: formData.concepto,
         centro_costos: formData.centro_costos,
-        tipo_egreso: formData.tipo,
+        moneda: formData.moneda,
+        tipo_transaccion: formData.tipo_transaccion,
+        ubicacion: formData.ubicacion,
         detalle: formData.detalle,
         fecha: formData.fecha
       }).eq('id', editingId);
@@ -66,14 +97,20 @@ export default function Egresos() {
         monto: parseFloat(formData.monto),
         concepto: formData.concepto,
         centro_costos: formData.centro_costos,
-        tipo_egreso: formData.tipo,
+        moneda: formData.moneda,
+        tipo_transaccion: formData.tipo_transaccion,
+        ubicacion: formData.ubicacion,
         detalle: formData.detalle,
         tipo: 'egreso',
         fecha: formData.fecha
       });
     }
     
-    setFormData({ monto: '', concepto: '', centro_costos: '', tipo: 'efectivo', detalle: '', fecha: new Date().toISOString().split('T')[0] });
+    setFormData({ 
+      monto: '', concepto: '', centro_costos: '', moneda: 'ARS', 
+      tipo_transaccion: 'efectivo', ubicacion: 'caja-general', 
+      detalle: '', fecha: new Date().toISOString().split('T')[0] 
+    });
     setShowForm(false);
     loadData();
   };
@@ -83,7 +120,9 @@ export default function Egresos() {
       monto: egreso.monto,
       concepto: egreso.concepto,
       centro_costos: egreso.centro_costos || '',
-      tipo: egreso.tipo_egreso || 'efectivo',
+      moneda: egreso.moneda || 'ARS',
+      tipo_transaccion: egreso.tipo_transaccion || 'efectivo',
+      ubicacion: egreso.ubicacion || 'caja-general',
       detalle: egreso.detalle || '',
       fecha: egreso.fecha.split('T')[0]
     });
@@ -103,8 +142,10 @@ export default function Egresos() {
       Fecha: new Date(e.fecha).toLocaleDateString('es-ES'),
       Concepto: e.concepto,
       Monto: e.monto,
-      Tipo: e.tipo_egreso === 'efectivo' ? 'Efectivo' : e.tipo_egreso === 'deposito' ? 'Depósito' : 'Extracción',
+      Moneda: e.moneda || 'ARS',
+      Tipo: tiposTransaccion.find(t => t.value === e.tipo_transaccion)?.label || '—',
       'Centro de Costos': e.centro_costos || '—',
+      Ubicación: ubicaciones.find(u => u.value === e.ubicacion)?.label || '—',
       Detalle: e.detalle || '—'
     }));
 
@@ -116,14 +157,19 @@ export default function Egresos() {
     link.click();
   };
 
+  const getMonedaSymbol = (moneda) => {
+    const symbols = { 'ARS': '$', 'USD': 'U$S', 'CLP': '$' };
+    return symbols[moneda] || '$';
+  };
+
   return (
     <div className="space-y-6">
       <div className="mb-8 flex justify-between items-center">
         <div>
           <h1 className="text-4xl font-bold text-navy mb-2">Egresos</h1>
-          <p className="text-gray-600">Registro y gestión de egresos</p>
+          <p className="text-gray-600">Registro y gestión de egresos en múltiples monedas y ubicaciones</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button
             onClick={handleExportCSV}
             className="btn-primary flex items-center gap-2"
@@ -142,12 +188,16 @@ export default function Egresos() {
             onClick={() => {
               setShowForm(!showForm);
               if (!showForm) setEditingId(null);
-              setFormData({ monto: '', concepto: '', centro_costos: '', tipo: 'efectivo', detalle: '', fecha: new Date().toISOString().split('T')[0] });
+              setFormData({ 
+                monto: '', concepto: '', centro_costos: '', moneda: 'ARS', 
+                tipo_transaccion: 'efectivo', ubicacion: 'caja-general', 
+                detalle: '', fecha: new Date().toISOString().split('T')[0] 
+              });
             }}
             className="btn-primary flex items-center gap-2"
           >
             <Plus size={20} />
-            {editingId ? 'Cancelar' : 'Nuevo Egreso'}
+            Nuevo Egreso
           </button>
         </div>
       </div>
@@ -196,7 +246,8 @@ export default function Egresos() {
               <X size={24} />
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <input
               type="number"
               placeholder="Monto"
@@ -217,40 +268,70 @@ export default function Egresos() {
               ))}
             </select>
             <select
+              value={formData.moneda}
+              onChange={(e) => setFormData({...formData, moneda: e.target.value})}
+              className="input-field"
+              required
+            >
+              {monedas.map((m) => (
+                <option key={m.code} value={m.code}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <select
+              value={formData.tipo_transaccion}
+              onChange={(e) => setFormData({...formData, tipo_transaccion: e.target.value})}
+              className="input-field"
+              required
+            >
+              {tiposTransaccion.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+            <select
+              value={formData.ubicacion}
+              onChange={(e) => setFormData({...formData, ubicacion: e.target.value})}
+              className="input-field"
+              required
+            >
+              {ubicaciones.map((u) => (
+                <option key={u.value} value={u.value}>{u.label}</option>
+              ))}
+            </select>
+            <select
               value={formData.centro_costos}
               onChange={(e) => setFormData({...formData, centro_costos: e.target.value})}
               className="input-field"
             >
-              <option value="">Selecciona centro de costos (opcional)</option>
+              <option value="">Selecciona centro costos (opcional)</option>
               {centrosCostos.map((c) => (
                 <option key={c.id} value={c.nombre}>{c.nombre}</option>
               ))}
             </select>
-            <select
-              value={formData.tipo}
-              onChange={(e) => setFormData({...formData, tipo: e.target.value})}
-              className="input-field"
-              required
-            >
-              <option value="efectivo">💵 Efectivo</option>
-              <option value="deposito">🏦 Depósito Bancario</option>
-              <option value="extraccion">💸 Extracción Bancaria</option>
-            </select>
-            <input
-              type="date"
-              value={formData.fecha}
-              onChange={(e) => setFormData({...formData, fecha: e.target.value})}
-              className="input-field"
-            />
+          </div>
+
+          <div className="mt-4">
             <input
               type="text"
               placeholder="Detalle/Observación (opcional)"
               value={formData.detalle}
               onChange={(e) => setFormData({...formData, detalle: e.target.value})}
-              className="input-field"
+              className="input-field w-full"
             />
           </div>
-          <button type="submit" className="btn-primary mt-4">
+
+          <div className="mt-4">
+            <input
+              type="date"
+              value={formData.fecha}
+              onChange={(e) => setFormData({...formData, fecha: e.target.value})}
+              className="input-field w-full"
+            />
+          </div>
+
+          <button type="submit" className="btn-primary mt-4 w-full">
             {editingId ? 'Actualizar Egreso' : 'Guardar Egreso'}
           </button>
         </form>
@@ -260,49 +341,53 @@ export default function Egresos() {
       <div className="card">
         <h2 className="text-xl font-bold text-navy mb-4">Últimos Egresos</h2>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full text-sm">
             <thead>
               <tr className="border-b-2 border-gold">
-                <th className="text-left p-3 text-navy font-bold text-sm">Fecha</th>
-                <th className="text-left p-3 text-navy font-bold text-sm">Concepto</th>
-                <th className="text-left p-3 text-navy font-bold text-sm">Monto</th>
-                <th className="text-left p-3 text-navy font-bold text-sm">Tipo</th>
-                <th className="text-left p-3 text-navy font-bold text-sm">Centro Costos</th>
-                <th className="text-left p-3 text-navy font-bold text-sm">Detalle</th>
-                <th className="text-left p-3 text-navy font-bold text-sm">Acciones</th>
+                <th className="text-left p-3 text-navy font-bold">Fecha</th>
+                <th className="text-left p-3 text-navy font-bold">Concepto</th>
+                <th className="text-left p-3 text-navy font-bold">Monto</th>
+                <th className="text-left p-3 text-navy font-bold">Moneda</th>
+                <th className="text-left p-3 text-navy font-bold">Tipo</th>
+                <th className="text-left p-3 text-navy font-bold">Ubicación</th>
+                <th className="text-left p-3 text-navy font-bold">Centro Costos</th>
+                <th className="text-left p-3 text-navy font-bold">Detalle</th>
+                <th className="text-left p-3 text-navy font-bold">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {egresos.length > 0 ? (
                 egresos.slice(0, 50).map((egr, idx) => (
                   <tr key={idx} className="border-b hover:bg-gray-50">
-                    <td className="p-3 text-sm">{new Date(egr.fecha).toLocaleDateString('es-ES')}</td>
-                    <td className="p-3 font-medium text-sm">{egr.concepto}</td>
-                    <td className="p-3 font-bold text-red-600">${egr.monto?.toLocaleString()}</td>
-                    <td className="p-3 text-sm">
-                      <span className={`px-2 py-1 rounded text-xs font-bold ${
-                        egr.tipo_egreso === 'efectivo' ? 'bg-red-100 text-red-800' :
-                        egr.tipo_egreso === 'deposito' ? 'bg-blue-100 text-blue-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {egr.tipo_egreso === 'efectivo' ? '💵 Efectivo' :
-                         egr.tipo_egreso === 'deposito' ? '🏦 Depósito' :
-                         '💸 Extracción'}
+                    <td className="p-3">{new Date(egr.fecha).toLocaleDateString('es-ES')}</td>
+                    <td className="p-3 font-medium">{egr.concepto}</td>
+                    <td className="p-3 font-bold text-red-600">{getMonedaSymbol(egr.moneda)} {egr.monto?.toLocaleString()}</td>
+                    <td className="p-3">
+                      <span className="font-semibold">
+                        {egr.moneda === 'ARS' && '🇦🇷 ARS'}
+                        {egr.moneda === 'USD' && '🇺🇸 USD'}
+                        {egr.moneda === 'CLP' && '🇨🇱 CLP'}
                       </span>
                     </td>
-                    <td className="p-3 text-sm">{egr.centro_costos || '—'}</td>
-                    <td className="p-3 text-sm text-gray-600">{egr.detalle || '—'}</td>
+                    <td className="p-3">
+                      <span className="px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-800">
+                        {tiposTransaccion.find(t => t.value === egr.tipo_transaccion)?.label || '—'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-xs">{ubicaciones.find(u => u.value === egr.ubicacion)?.label || '—'}</td>
+                    <td className="p-3 text-xs">{egr.centro_costos || '—'}</td>
+                    <td className="p-3 text-gray-600">{egr.detalle || '—'}</td>
                     <td className="p-3 flex gap-2">
                       <button
                         onClick={() => handleEditEgreso(egr)}
-                        className="text-blue-600 hover:text-blue-800 p-1"
+                        className="text-blue-600 hover:text-blue-800"
                         title="Editar"
                       >
                         <Edit2 size={18} />
                       </button>
                       <button
                         onClick={() => handleDeleteEgreso(egr.id)}
-                        className="text-red-600 hover:text-red-800 p-1"
+                        className="text-red-600 hover:text-red-800"
                         title="Eliminar"
                       >
                         <Trash2 size={18} />
@@ -312,7 +397,7 @@ export default function Egresos() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="p-6 text-center text-gray-500">
+                  <td colSpan="9" className="p-6 text-center text-gray-500">
                     No hay egresos registrados
                   </td>
                 </tr>
