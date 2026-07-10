@@ -1,7 +1,40 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { Download, Plus, Settings, Edit2, Trash2, X, Upload } from 'lucide-react';
+import { Download, Plus, Settings, Edit2, Trash2, X, Upload, Filter } from 'lucide-react';
 import Papa from 'papaparse';
+
+
+const PERIODOS_FILTRO = [
+  { value: 'todo', label: 'Todo' },
+  { value: 'este-mes', label: 'Este mes' },
+  { value: 'mes-anterior', label: 'Mes anterior' },
+  { value: 'ultimos-3-meses', label: 'Últimos 3 meses' },
+  { value: 'este-anio', label: 'Este año' },
+  { value: 'personalizado', label: 'Personalizado' },
+];
+
+function rangoPeriodo(periodo, desde, hasta) {
+  const hoy = new Date();
+  const inicioDia = (d) => { d.setHours(0, 0, 0, 0); return d; };
+  const finDia = (d) => { d.setHours(23, 59, 59, 999); return d; };
+  switch (periodo) {
+    case 'este-mes':
+      return [inicioDia(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), finDia(new Date(hoy))];
+    case 'mes-anterior':
+      return [inicioDia(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)), finDia(new Date(hoy.getFullYear(), hoy.getMonth(), 0))];
+    case 'ultimos-3-meses':
+      return [inicioDia(new Date(hoy.getFullYear(), hoy.getMonth() - 2, 1)), finDia(new Date(hoy))];
+    case 'este-anio':
+      return [inicioDia(new Date(hoy.getFullYear(), 0, 1)), finDia(new Date(hoy))];
+    case 'personalizado':
+      return [
+        desde ? inicioDia(new Date(desde + 'T00:00:00')) : new Date(2000, 0, 1),
+        hasta ? finDia(new Date(hasta + 'T00:00:00')) : finDia(new Date(hoy)),
+      ];
+    default:
+      return [new Date(2000, 0, 1), finDia(new Date(hoy))];
+  }
+}
 
 export default function Egresos() {
   const [egresos, setEgresos] = useState([]);
@@ -13,6 +46,13 @@ export default function Egresos() {
   const [newConcept, setNewConcept] = useState('');
   const [importMessage, setImportMessage] = useState('');
   const fileInputRef = useRef(null);
+
+  // Filtros de la tabla
+  const [filtroPeriodo, setFiltroPeriodo] = useState('todo');
+  const [filtroDesde, setFiltroDesde] = useState('');
+  const [filtroHasta, setFiltroHasta] = useState('');
+  const [filtroTemplo, setFiltroTemplo] = useState('');
+  const [filtroCaja, setFiltroCaja] = useState('');
   const [formData, setFormData] = useState({
     monto: '',
     concepto: '',
@@ -152,8 +192,35 @@ export default function Egresos() {
     }
   };
 
+  // Registros filtrados por período, templo y caja
+  const filtrados = useMemo(() => {
+    const [ini, fin] = rangoPeriodo(filtroPeriodo, filtroDesde, filtroHasta);
+    return egresos.filter(m => {
+      const f = new Date(m.fecha);
+      if (f < ini || f > fin) return false;
+      if (filtroTemplo && m.templo_id !== filtroTemplo) return false;
+      if (filtroCaja && (m.ubicacion || 'general') !== filtroCaja) return false;
+      return true;
+    });
+  }, [egresos, filtroPeriodo, filtroDesde, filtroHasta, filtroTemplo, filtroCaja]);
+
+  // Totales por moneda de los registros filtrados
+  const totalesFiltrados = useMemo(() => {
+    const t = {};
+    filtrados.forEach(m => {
+      const mon = m.moneda || 'ARS';
+      t[mon] = (t[mon] || 0) + (m.monto || 0);
+    });
+    return t;
+  }, [filtrados]);
+
+  const limpiarFiltros = () => {
+    setFiltroPeriodo('todo'); setFiltroDesde(''); setFiltroHasta('');
+    setFiltroTemplo(''); setFiltroCaja('');
+  };
+
   const handleExportCSV = () => {
-    const data = egresos.map(ing => ({
+    const data = filtrados.map(ing => ({
       Fecha: new Date(ing.fecha).toLocaleDateString('es-ES'),
       Concepto: ing.concepto,
       Monto: ing.monto,
@@ -369,6 +436,58 @@ export default function Egresos() {
         </div>
       </div>
 
+      {/* FILTROS DE LA TABLA */}
+      <div className="card bg-blue-50 border-l-4 border-blue-500">
+        <h2 className="text-lg font-bold text-navy mb-3 flex items-center gap-2">
+          <Filter size={20} /> Filtros
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-navy mb-1">Período</label>
+            <select value={filtroPeriodo} onChange={(e) => setFiltroPeriodo(e.target.value)} className="input-field w-full">
+              {PERIODOS_FILTRO.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-navy mb-1">Templo</label>
+            <select value={filtroTemplo} onChange={(e) => setFiltroTemplo(e.target.value)} className="input-field w-full">
+              <option value="">Todos los templos</option>
+              {templos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-navy mb-1">Caja / Ubicación</label>
+            <select value={filtroCaja} onChange={(e) => setFiltroCaja(e.target.value)} className="input-field w-full">
+              <option value="">Todas las cajas</option>
+              {ubicaciones.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button onClick={limpiarFiltros} className="btn-secondary w-full">Limpiar filtros</button>
+          </div>
+        </div>
+        {filtroPeriodo === 'personalizado' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+            <div>
+              <label className="block text-xs font-bold text-navy mb-1">Desde</label>
+              <input type="date" value={filtroDesde} onChange={(e) => setFiltroDesde(e.target.value)} className="input-field w-full" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-navy mb-1">Hasta</label>
+              <input type="date" value={filtroHasta} onChange={(e) => setFiltroHasta(e.target.value)} className="input-field w-full" />
+            </div>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-4 mt-3 text-sm">
+          <span className="font-bold text-navy">{filtrados.length.toLocaleString('es-AR')} egresos</span>
+          {Object.entries(totalesFiltrados).map(([mon, total]) => (
+            <span key={mon} className="font-bold text-red-600">
+              Total {mon}: {getMonedaSymbol(mon)} {total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* Mensaje de importación */}
       {importMessage && (
         <div className={`card ${importMessage.includes('✅') ? 'bg-green-50 border-l-4 border-green-500' : 'bg-red-50 border-l-4 border-red-500'}`}>
@@ -513,7 +632,7 @@ export default function Egresos() {
 
       {/* Tabla de ingresos */}
       <div className="card">
-        <h2 className="text-xl font-bold text-navy mb-4">Últimos Egresos</h2>
+        <h2 className="text-xl font-bold text-navy mb-4">Egresos ({filtrados.length.toLocaleString('es-AR')})</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -530,8 +649,8 @@ export default function Egresos() {
               </tr>
             </thead>
             <tbody>
-              {egresos.length > 0 ? (
-                egresos.slice(0, 50).map((ing, idx) => (
+              {filtrados.length > 0 ? (
+                filtrados.slice(0, 100).map((ing, idx) => (
                   <tr key={idx} className="border-b hover:bg-gray-50">
                     <td className="p-3">{new Date(ing.fecha).toLocaleDateString('es-ES')}</td>
                     <td className="p-3 font-medium">{ing.concepto}</td>
@@ -572,7 +691,7 @@ export default function Egresos() {
               ) : (
                 <tr>
                   <td colSpan="9" className="p-6 text-center text-gray-500">
-                    No hay egresos registrados
+                    No hay egresos con los filtros seleccionados
                   </td>
                 </tr>
               )}
