@@ -6,7 +6,7 @@ import Papa from 'papaparse';
 export default function Egresos() {
   const [egresos, setEgresos] = useState([]);
   const [conceptos, setConceptos] = useState([]);
-  const [centrosCostos, setCentrosCostos] = useState([]);
+  const [templos, setTemplos] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -14,7 +14,7 @@ export default function Egresos() {
   const [formData, setFormData] = useState({
     monto: '',
     concepto: '',
-    centro_costos: '',
+    templo: '',
     moneda: 'ARS',
     tipo_transaccion: 'efectivo',
     ubicacion: 'general',
@@ -73,8 +73,8 @@ export default function Egresos() {
     const { data: conceptosData } = await supabase.from('conceptos').select('*').eq('tipo', 'egreso');
     setConceptos(conceptosData || []);
 
-    const { data: centers } = await supabase.from('centro_costos').select('*');
-    setCentrosCostos(centers || []);
+    const { data: temp } = await supabase.from('templos').select('*');
+    setTemplos(temp || []);
   };
 
   const handleAddConcept = async () => {
@@ -96,7 +96,7 @@ export default function Egresos() {
       await supabase.from('movimientos').update({
         monto: parseFloat(formData.monto),
         concepto: formData.concepto,
-        centro_costos: formData.centro_costos,
+        templo_id: formData.templo,
         moneda: formData.moneda,
         tipo_transaccion: formData.tipo_transaccion,
         ubicacion: formData.ubicacion,
@@ -109,7 +109,7 @@ export default function Egresos() {
       await supabase.from('movimientos').insert({
         monto: parseFloat(formData.monto),
         concepto: formData.concepto,
-        centro_costos: formData.centro_costos,
+        templo_id: formData.templo,
         moneda: formData.moneda,
         tipo_transaccion: formData.tipo_transaccion,
         ubicacion: formData.ubicacion,
@@ -120,7 +120,7 @@ export default function Egresos() {
     }
     
     setFormData({ 
-      monto: '', concepto: '', centro_costos: '', moneda: 'ARS', 
+      monto: '', concepto: '', templo: '', moneda: 'ARS', 
       tipo_transaccion: 'efectivo', ubicacion: 'general', 
       detalle: '', fecha: new Date().toISOString().split('T')[0] 
     });
@@ -132,7 +132,7 @@ export default function Egresos() {
     setFormData({
       monto: egreso.monto,
       concepto: egreso.concepto,
-      centro_costos: egreso.centro_costos || '',
+      templo: egreso.templo_id || '',
       moneda: egreso.moneda || 'ARS',
       tipo_transaccion: egreso.tipo_transaccion || 'efectivo',
       ubicacion: egreso.ubicacion || 'general',
@@ -157,8 +157,8 @@ export default function Egresos() {
       Monto: e.monto,
       Moneda: e.moneda || 'ARS',
       Tipo: tiposTransaccion.find(t => t.value === e.tipo_transaccion)?.label || '—',
-      'Centro de Costos': e.centro_costos || '—',
       Ubicación: ubicaciones.find(u => u.value === e.ubicacion)?.label || '—',
+      Templo: e.templo_id ? templos.find(t => t.id === e.templo_id)?.nombre || '—' : '—',
       Detalle: e.detalle || '—'
     }));
 
@@ -202,7 +202,7 @@ export default function Egresos() {
               setShowForm(!showForm);
               if (!showForm) setEditingId(null);
               setFormData({ 
-                monto: '', concepto: '', centro_costos: '', moneda: 'ARS', 
+                monto: '', concepto: '', templo: '', moneda: 'ARS', 
                 tipo_transaccion: 'efectivo', ubicacion: 'general', 
                 detalle: '', fecha: new Date().toISOString().split('T')[0] 
               });
@@ -314,13 +314,13 @@ export default function Egresos() {
               ))}
             </select>
             <select
-              value={formData.centro_costos}
-              onChange={(e) => setFormData({...formData, centro_costos: e.target.value})}
+              value={formData.templo}
+              onChange={(e) => setFormData({...formData, templo: e.target.value})}
               className="input-field"
             >
-              <option value="">Selecciona centro costos (opcional)</option>
-              {centrosCostos.map((c) => (
-                <option key={c.id} value={c.nombre}>{c.nombre}</option>
+              <option value="">Selecciona templo (opcional)</option>
+              {templos.map((t) => (
+                <option key={t.id} value={t.id}>{t.nombre}</option>
               ))}
             </select>
           </div>
@@ -363,7 +363,7 @@ export default function Egresos() {
                 <th className="text-left p-3 text-navy font-bold">Moneda</th>
                 <th className="text-left p-3 text-navy font-bold">Tipo</th>
                 <th className="text-left p-3 text-navy font-bold">Ubicación</th>
-                <th className="text-left p-3 text-navy font-bold">Centro Costos</th>
+                <th className="text-left p-3 text-navy font-bold">Templo</th>
                 <th className="text-left p-3 text-navy font-bold">Detalle</th>
                 <th className="text-left p-3 text-navy font-bold">Acciones</th>
               </tr>
@@ -388,7 +388,7 @@ export default function Egresos() {
                       </span>
                     </td>
                     <td className="p-3 text-xs">{ubicaciones.find(u => u.value === egr.ubicacion)?.label || '—'}</td>
-                    <td className="p-3 text-xs">{egr.centro_costos || '—'}</td>
+                    <td className="p-3 text-xs">{egr.templo_id ? templos.find(t => t.id === egr.templo_id)?.nombre || '—' : '—'}</td>
                     <td className="p-3 text-gray-600">{egr.detalle || '—'}</td>
                     <td className="p-3 flex gap-2">
                       <button
