@@ -32,6 +32,14 @@ const PERIODOS = [
   { value: 'personalizado', label: 'Personalizado' },
 ];
 
+
+// Parsear fecha como fecha LOCAL (evita el corrimiento de un día por zona horaria)
+function parseFechaLocal(fecha) {
+  if (!fecha) return new Date(0);
+  const [y, m, d] = String(fecha).split('T')[0].split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
 function rangoPeriodo(periodo, desde, hasta) {
   const hoy = new Date();
   const inicioDia = (d) => { d.setHours(0, 0, 0, 0); return d; };
@@ -103,7 +111,7 @@ export default function Reportes() {
     const [ini, fin] = rangoPeriodo(periodo, desde, hasta);
     return movimientos.filter(m => {
       if ((m.moneda || 'ARS') !== moneda) return false;
-      const f = new Date(m.fecha);
+      const f = parseFechaLocal(m.fecha);
       if (f < ini || f > fin) return false;
       if (temploFiltro && m.templo_id !== temploFiltro) return false;
       if (cajaFiltro && (m.ubicacion || 'general') !== cajaFiltro) return false;
@@ -168,7 +176,7 @@ export default function Reportes() {
 
   const exportarCSV = () => {
     const data = filtrados.map(m => ({
-      Fecha: new Date(m.fecha).toLocaleDateString('es-ES'),
+      Fecha: parseFechaLocal(m.fecha).toLocaleDateString('es-ES'),
       Tipo: m.tipo === 'ingreso' ? 'INGRESO' : 'EGRESO',
       Concepto: m.concepto,
       Monto: m.monto,
@@ -332,7 +340,7 @@ export default function Reportes() {
                   ) : (
                     filtrados.slice(0, 200).map((m, idx) => (
                       <tr key={idx} className="border-b hover:bg-gray-50">
-                        <td className="p-3">{new Date(m.fecha).toLocaleDateString('es-ES')}</td>
+                        <td className="p-3">{parseFechaLocal(m.fecha).toLocaleDateString('es-ES')}</td>
                         <td className="p-3">
                           <span className={`px-2 py-1 rounded text-xs font-bold ${m.tipo === 'ingreso' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                             {m.tipo === 'ingreso' ? 'INGRESO' : 'EGRESO'}
