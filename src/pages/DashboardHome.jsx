@@ -42,6 +42,14 @@ const PERIODOS = [
   { value: 'personalizado', label: 'Personalizado' },
 ];
 
+
+// Parsear fecha como fecha LOCAL (evita el corrimiento de un día por zona horaria)
+function parseFechaLocal(fecha) {
+  if (!fecha) return new Date(0);
+  const [y, m, d] = String(fecha).split('T')[0].split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
 function rangoPeriodo(periodo, desde, hasta) {
   const hoy = new Date();
   const inicioDia = (d) => { d.setHours(0, 0, 0, 0); return d; };
@@ -108,7 +116,7 @@ export default function DashboardHome() {
     const [ini, fin] = rangoPeriodo(periodo, desde, hasta);
     return movimientos.filter(m => {
       if ((m.moneda || 'ARS') !== moneda) return false;
-      const f = new Date(m.fecha);
+      const f = parseFechaLocal(m.fecha);
       if (f < ini || f > fin) return false;
       if (temploFiltro && m.templo_id !== temploFiltro) return false;
       if (cajaFiltro && (m.ubicacion || 'general') !== cajaFiltro) return false;
@@ -133,7 +141,7 @@ export default function DashboardHome() {
     const porMes = dias > 62;
     const grouped = {};
     movsFiltrados.forEach(m => {
-      const f = new Date(m.fecha);
+      const f = parseFechaLocal(m.fecha);
       const key = porMes
         ? `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}`
         : m.fecha.split('T')[0];
