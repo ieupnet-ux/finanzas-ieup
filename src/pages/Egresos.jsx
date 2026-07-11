@@ -1,5 +1,28 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
+
+// Traer TODOS los movimientos superando el límite de 1000 filas de Supabase
+async function fetchTodosMovimientos(tipo = null) {
+  const LOTE = 1000;
+  let todos = [];
+  let from = 0;
+  while (true) {
+    let q = supabase
+      .from('movimientos')
+      .select('*')
+      .order('fecha', { ascending: true })
+      .range(from, from + LOTE - 1);
+    if (tipo) q = q.eq('tipo', tipo);
+    const { data, error } = await q;
+    if (error) { console.error('Error cargando movimientos:', error); break; }
+    if (!data || data.length === 0) break;
+    todos = todos.concat(data);
+    if (data.length < LOTE) break;
+    from += LOTE;
+  }
+  return todos;
+}
+
 import { Download, Plus, Settings, Edit2, Trash2, X, Upload, Filter } from 'lucide-react';
 import Papa from 'papaparse';
 
@@ -139,8 +162,8 @@ export default function Egresos() {
   }, [filtroPeriodo, filtroDesde, filtroHasta, filtroTemplo, filtroCaja, sortField, sortDir]);
 
   const loadData = async () => {
-    const { data: egr } = await supabase.from('movimientos').select('*').eq('tipo', 'egreso');
-    setEgresos(egr || []);
+    const egr = await fetchTodosMovimientos('egreso');
+    setEgresos(egr);
 
     const { data: temp } = await supabase.from('templos').select('*');
     setTemplos(temp || []);
