@@ -165,7 +165,7 @@ export default function Ingresos() {
     e.preventDefault();
     
     if (editingId) {
-      await supabase.from('movimientos').update({
+      const { error } = await supabase.from('movimientos').update({
         monto: parseFloat(formData.monto),
         concepto: formData.concepto,
         templo_id: formData.templo || null,
@@ -175,10 +175,17 @@ export default function Ingresos() {
         detalle: formData.detalle,
         fecha: formData.fecha
       }).eq('id', editingId);
-      
+
+      if (error) {
+        setImportMessage(`❌ Error al actualizar: ${error.message}`);
+        setTimeout(() => setImportMessage(''), 6000);
+        return;
+      }
+      setImportMessage('✅ Registro actualizado correctamente');
+      setTimeout(() => setImportMessage(''), 4000);
       setEditingId(null);
     } else {
-      await supabase.from('movimientos').insert({
+      const { error } = await supabase.from('movimientos').insert({
         monto: parseFloat(formData.monto),
         concepto: formData.concepto,
         templo_id: formData.templo || null,
@@ -189,6 +196,12 @@ export default function Ingresos() {
         tipo: 'ingreso',
         fecha: formData.fecha
       });
+
+      if (error) {
+        setImportMessage(`❌ Error al guardar: ${error.message}`);
+        setTimeout(() => setImportMessage(''), 6000);
+        return;
+      }
     }
     
     setFormData({ 
@@ -209,10 +222,13 @@ export default function Ingresos() {
       tipo_transaccion: ingreso.tipo_transaccion || 'efectivo',
       ubicacion: ingreso.ubicacion || 'general',
       detalle: ingreso.detalle || '',
-      fecha: ingreso.fecha.split('T')[0]
+      fecha: (ingreso.fecha || new Date().toISOString()).split('T')[0]
     });
     setEditingId(ingreso.id);
     setShowForm(true);
+    setShowSettings(false);
+    // Subir al formulario para que el usuario lo vea
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
   };
 
   const handleDeleteIngreso = async (id) => {
@@ -622,6 +638,9 @@ export default function Ingresos() {
               required
             >
               <option value="">Selecciona concepto</option>
+              {formData.concepto && !conceptos.some(c => c.tipo === 'ingreso' && c.nombre === formData.concepto) && (
+                <option value={formData.concepto}>{formData.concepto}</option>
+              )}
               {conceptos.filter(c => c.tipo === 'ingreso').map((c) => (
                 <option key={c.id} value={c.nombre}>{c.nombre}</option>
               ))}
