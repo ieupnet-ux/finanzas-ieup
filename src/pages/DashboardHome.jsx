@@ -1,5 +1,28 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
+
+// Traer TODOS los movimientos superando el límite de 1000 filas de Supabase
+async function fetchTodosMovimientos(tipo = null) {
+  const LOTE = 1000;
+  let todos = [];
+  let from = 0;
+  while (true) {
+    let q = supabase
+      .from('movimientos')
+      .select('*')
+      .order('fecha', { ascending: true })
+      .range(from, from + LOTE - 1);
+    if (tipo) q = q.eq('tipo', tipo);
+    const { data, error } = await q;
+    if (error) { console.error('Error cargando movimientos:', error); break; }
+    if (!data || data.length === 0) break;
+    todos = todos.concat(data);
+    if (data.length < LOTE) break;
+    from += LOTE;
+  }
+  return todos;
+}
+
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
@@ -93,11 +116,11 @@ export default function DashboardHome() {
 
   const loadData = async () => {
     try {
-      const [movRes, tempRes] = await Promise.all([
-        supabase.from('movimientos').select('*').order('fecha', { ascending: true }),
+      const [movs, tempRes] = await Promise.all([
+        fetchTodosMovimientos(),
         supabase.from('templos').select('*'),
       ]);
-      setMovimientos(movRes.data || []);
+      setMovimientos(movs);
       setTemplos(tempRes.data || []);
     } catch (error) {
       console.error('Error:', error);
