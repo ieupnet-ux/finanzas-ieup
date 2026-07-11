@@ -53,6 +53,19 @@ export default function Ingresos() {
   const [filtroHasta, setFiltroHasta] = useState('');
   const [filtroTemplo, setFiltroTemplo] = useState('');
   const [filtroCaja, setFiltroCaja] = useState('');
+
+  // Ordenamiento de la tabla
+  const [sortField, setSortField] = useState('fecha');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
   const [formData, setFormData] = useState({
     monto: '',
     concepto: '',
@@ -214,13 +227,45 @@ export default function Ingresos() {
     return t;
   }, [filtrados]);
 
+  // Registros ordenados según la columna seleccionada
+  const ordenados = useMemo(() => {
+    const arr = [...filtrados];
+    arr.sort((a, b) => {
+      let va = a[sortField];
+      let vb = b[sortField];
+      if (sortField === 'templo') {
+        va = a.templo_id ? (templos.find(t => t.id === a.templo_id)?.nombre || '') : '';
+        vb = b.templo_id ? (templos.find(t => t.id === b.templo_id)?.nombre || '') : '';
+      }
+      if (sortField === 'fecha') {
+        va = new Date(a.fecha).getTime();
+        vb = new Date(b.fecha).getTime();
+      } else if (sortField === 'monto') {
+        va = a.monto || 0;
+        vb = b.monto || 0;
+      } else {
+        va = String(va || '').toLowerCase();
+        vb = String(vb || '').toLowerCase();
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [filtrados, sortField, sortDir]);
+
+  const flecha = (field) => {
+    if (sortField !== field) return <span className="opacity-30 ml-1">↕</span>;
+    return <span className="ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
+
   const limpiarFiltros = () => {
     setFiltroPeriodo('todo'); setFiltroDesde(''); setFiltroHasta('');
     setFiltroTemplo(''); setFiltroCaja('');
   };
 
   const handleExportCSV = () => {
-    const data = filtrados.map(ing => ({
+    const data = ordenados.map(ing => ({
       Fecha: new Date(ing.fecha).toLocaleDateString('es-ES'),
       Concepto: ing.concepto,
       Monto: ing.monto,
@@ -637,19 +682,19 @@ export default function Ingresos() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b-2 border-gold">
-                <th className="text-left p-3 text-navy font-bold">Fecha</th>
-                <th className="text-left p-3 text-navy font-bold">Concepto</th>
-                <th className="text-left p-3 text-navy font-bold">Monto</th>
-                <th className="text-left p-3 text-navy font-bold">Moneda</th>
-                <th className="text-left p-3 text-navy font-bold">Tipo</th>
-                <th className="text-left p-3 text-navy font-bold">Ubicación</th>
-                <th className="text-left p-3 text-navy font-bold">Detalle</th>
+                <th className="text-left p-3 text-navy font-bold cursor-pointer select-none hover:bg-gold hover:bg-opacity-20 transition" onClick={() => handleSort('fecha')}>Fecha{flecha('fecha')}</th>
+                <th className="text-left p-3 text-navy font-bold cursor-pointer select-none hover:bg-gold hover:bg-opacity-20 transition" onClick={() => handleSort('concepto')}>Concepto{flecha('concepto')}</th>
+                <th className="text-left p-3 text-navy font-bold cursor-pointer select-none hover:bg-gold hover:bg-opacity-20 transition" onClick={() => handleSort('monto')}>Monto{flecha('monto')}</th>
+                <th className="text-left p-3 text-navy font-bold cursor-pointer select-none hover:bg-gold hover:bg-opacity-20 transition" onClick={() => handleSort('moneda')}>Moneda{flecha('moneda')}</th>
+                <th className="text-left p-3 text-navy font-bold cursor-pointer select-none hover:bg-gold hover:bg-opacity-20 transition" onClick={() => handleSort('tipo_transaccion')}>Tipo{flecha('tipo_transaccion')}</th>
+                <th className="text-left p-3 text-navy font-bold cursor-pointer select-none hover:bg-gold hover:bg-opacity-20 transition" onClick={() => handleSort('ubicacion')}>Ubicación{flecha('ubicacion')}</th>
+                <th className="text-left p-3 text-navy font-bold cursor-pointer select-none hover:bg-gold hover:bg-opacity-20 transition" onClick={() => handleSort('detalle')}>Detalle{flecha('detalle')}</th>
                 <th className="text-left p-3 text-navy font-bold">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {filtrados.length > 0 ? (
-                filtrados.slice(0, 100).map((ing, idx) => (
+              {ordenados.length > 0 ? (
+                ordenados.slice(0, 100).map((ing, idx) => (
                   <tr key={idx} className="border-b hover:bg-gray-50">
                     <td className="p-3">{new Date(ing.fecha).toLocaleDateString('es-ES')}</td>
                     <td className="p-3 font-medium">{ing.concepto}</td>
