@@ -34,6 +34,7 @@ const LABELS = {
   'jovenes': 'Jóvenes', 'ninos': 'Niños', 'porteras': 'Porteras',
   'porteros': 'Porteros', 'emisora': 'Emisora', 'cajas': 'Cajas',
   'reposteria': 'Repostería', 'secretaria': 'Secretaría',
+  'kiosco': 'Kiosco', 'comedor': 'Comedor', 'libreria': 'Librería',
   'banco-nacion': 'Banco Nación', 'banco-macro': 'Banco Macro',
   'plazo-fijo': 'Plazo Fijo', 'mercado-pago': 'Mercado Pago',
   'billetera-virtual': 'Billetera Virtual', 'otro': 'Otro',
@@ -62,6 +63,10 @@ function parseFechaLocal(fecha) {
   const [y, m, d] = String(fecha).split('T')[0].split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 }
+
+
+// Detectar movimientos de Saldo Inicial (apertura)
+const esSaldoInicial = (m) => (m.concepto || '').trim().toLowerCase() === 'saldo inicial';
 
 function rangoPeriodo(periodo, desde, hasta) {
   const hoy = new Date();
@@ -102,6 +107,7 @@ export default function Reportes() {
   const [cajaFiltro, setCajaFiltro] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState(''); // ingreso / egreso / ''
   const [conceptoFiltro, setConceptoFiltro] = useState('');
+  const [incluirSI, setIncluirSI] = useState(true);
 
   useEffect(() => { loadData(); }, []);
 
@@ -140,9 +146,10 @@ export default function Reportes() {
       if (cajaFiltro && (m.ubicacion || 'general') !== cajaFiltro) return false;
       if (tipoFiltro && m.tipo !== tipoFiltro) return false;
       if (conceptoFiltro && m.concepto !== conceptoFiltro) return false;
+      if (!incluirSI && esSaldoInicial(m)) return false;
       return true;
     });
-  }, [movimientos, moneda, periodo, desde, hasta, temploFiltro, cajaFiltro, tipoFiltro, conceptoFiltro]);
+  }, [movimientos, moneda, periodo, desde, hasta, temploFiltro, cajaFiltro, tipoFiltro, conceptoFiltro, incluirSI]);
 
   const stats = useMemo(() => {
     let ingresos = 0, egresos = 0;
@@ -303,8 +310,17 @@ export default function Reportes() {
             </div>
           </div>
         )}
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-4">
           <button onClick={limpiarFiltros} className="btn-secondary">Limpiar filtros</button>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={incluirSI}
+              onChange={(e) => setIncluirSI(e.target.checked)}
+              className="w-4 h-4 accent-[#001f3f]"
+            />
+            <span className="text-sm font-bold text-navy">Incluir Saldo Inicial</span>
+          </label>
         </div>
       </div>
 
