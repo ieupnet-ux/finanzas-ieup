@@ -36,7 +36,7 @@ const GRUPOS = {
   cajas: {
     titulo: 'Cajas',
     icon: Wallet,
-    items: ['adolescentes', 'ciclistas', 'coro', 'coro-juvenil', 'dorcas', 'general', 'jovenes', 'ninos', 'porteras', 'porteros', 'emisora', 'cajas', 'reposteria', 'secretaria'],
+    items: ['adolescentes', 'ciclistas', 'coro', 'coro-juvenil', 'dorcas', 'general', 'jovenes', 'ninos', 'porteras', 'porteros', 'emisora', 'cajas', 'reposteria', 'secretaria', 'kiosco', 'comedor', 'libreria'],
   },
   bancos: {
     titulo: 'Bancos',
@@ -56,6 +56,7 @@ const LABELS = {
   'jovenes': 'Jóvenes', 'ninos': 'Niños', 'porteras': 'Porteras',
   'porteros': 'Porteros', 'emisora': 'Emisora', 'cajas': 'Cajas',
   'reposteria': 'Repostería', 'secretaria': 'Secretaría',
+  'kiosco': 'Kiosco', 'comedor': 'Comedor', 'libreria': 'Librería',
   'banco-nacion': 'Banco Nación', 'banco-macro': 'Banco Macro',
   'plazo-fijo': 'Plazo Fijo', 'mercado-pago': 'Mercado Pago',
   'billetera-virtual': 'Billetera Virtual', 'otro': 'Otro',
