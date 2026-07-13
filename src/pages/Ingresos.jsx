@@ -142,6 +142,9 @@ export default function Ingresos() {
     { value: 'cajas', label: '📦 Cajas' },
     { value: 'reposteria', label: '🍰 Repostería' },
     { value: 'secretaria', label: '📋 Secretaría' },
+    { value: 'kiosco', label: '🏪 Kiosco' },
+    { value: 'comedor', label: '🍽️ Comedor' },
+    { value: 'libreria', label: '📚 Librería' },
     // BANCOS
     { value: 'banco-nacion', label: '🏦 Banco Nación' },
     { value: 'banco-macro', label: '🏦 Banco Macro' },
