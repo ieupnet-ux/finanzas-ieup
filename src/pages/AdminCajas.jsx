@@ -60,7 +60,10 @@ export default function AdminCajas() {
     nombre.toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // quitar acentos
       .replace(/[^a-z0-9\s-]/g, '')                        // solo letras, números, espacios y guiones
-      .trim().replace(/\s+/g, '-');                        // espacios → guiones
+      .trim()
+      .replace(/\s*-\s*/g, '-')                            // "espacios-espacios" → "-"
+      .replace(/\s+/g, '-')                                 // espacios sueltos → "-"
+      .replace(/-+/g, '-');                                 // colapsar guiones múltiples
 
   const abrirNuevo = () => {
     setEditandoId(null);
