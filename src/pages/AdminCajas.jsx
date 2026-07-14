@@ -86,10 +86,14 @@ export default function AdminCajas() {
 
   const guardar = async (e) => {
     e.preventDefault();
-    if (!form.nombre.trim()) return mostrarMensaje('❌ El nombre es obligatorio');
+    // Para bancos nuevos, el nombre se arma después con los 3 campos — no es requisito acá
+    const esBancoNuevo = form.grupo === 'bancos' && !editandoId;
+    if (!esBancoNuevo && !form.nombre.trim()) {
+      return mostrarMensaje('❌ El nombre es obligatorio');
+    }
 
     const datos = {
-      nombre: form.nombre.trim(),
+      nombre: esBancoNuevo ? '' : form.nombre.trim(),  // Se arma después si es banco nuevo
       emoji: form.emoji || '📦',
       grupo: form.grupo,
       templo_id: form.templo_id || null,
