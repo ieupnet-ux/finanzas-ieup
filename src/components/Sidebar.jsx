@@ -1,7 +1,35 @@
-import { LogOut, Home, TrendingDown, DollarSign, Wallet, BarChart3, Users, AlertCircle, Settings } from 'lucide-react';
+import { LogOut, Home, TrendingDown, DollarSign, Wallet, BarChart3, Users, AlertCircle, Settings, UserCircle } from 'lucide-react';
 
-export default function Sidebar({ activePage, onNavigate, onLogout }) {
-  const menuItems = [
+// Definición de permisos por rol para el menú
+// admin y tesorero acceden a todo (salvo config/usuarios exclusivos de admin)
+// operador ve lo operativo, no config ni auditoría
+// auditor solo lectura, sin editar movimientos
+const PERMISOS_MENU = {
+  admin:    ['dashboard', 'ingresos', 'egresos', 'finanzas', 'reportes', 'usuarios', 'auditoria', 'configuracion'],
+  tesorero: ['dashboard', 'ingresos', 'egresos', 'finanzas', 'reportes'],
+  auditor:  ['dashboard', 'finanzas', 'reportes', 'auditoria'],
+  operador: ['dashboard', 'ingresos', 'egresos', 'reportes'],
+};
+
+const ROLES_LABEL = {
+  admin: 'Administrador',
+  tesorero: 'Tesorero',
+  auditor: 'Auditor',
+  operador: 'Operador',
+};
+
+const ROLES_COLOR = {
+  admin: 'bg-gold text-navy',
+  tesorero: 'bg-green-500 text-white',
+  auditor: 'bg-purple-500 text-white',
+  operador: 'bg-blue-500 text-white',
+};
+
+export default function Sidebar({ usuario, activePage, onNavigate, onLogout }) {
+  const rol = usuario?.rol || 'operador';
+  const menuPermitido = PERMISOS_MENU[rol] || PERMISOS_MENU.operador;
+
+  const menuItemsAll = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'ingresos', label: 'Ingresos', icon: TrendingDown },
     { id: 'egresos', label: 'Egresos', icon: DollarSign },
@@ -9,18 +37,16 @@ export default function Sidebar({ activePage, onNavigate, onLogout }) {
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     { id: 'usuarios', label: 'Usuarios', icon: Users },
     { id: 'auditoria', label: 'Auditoría', icon: AlertCircle },
-    { id: 'configuracion', label: 'Configuración', icon: Settings }
+    { id: 'configuracion', label: 'Configuración', icon: Settings },
   ];
+
+  const menuItems = menuItemsAll.filter(item => menuPermitido.includes(item.id));
 
   return (
     <div className="w-64 bg-navy text-cream h-screen flex flex-col fixed left-0 top-0 shadow-xl">
       <div className="p-6 border-b border-gold border-opacity-20">
         <div className="flex items-center gap-3 mb-2">
-          <img 
-            src="/logo-white.png" 
-            alt="IEUP" 
-            className="w-10 h-10"
-          />
+          <img src="/logo-white.png" alt="IEUP" className="w-10 h-10" />
           <div>
             <h1 className="text-lg font-bold text-gold">Finanzas</h1>
             <p className="text-xs text-cream opacity-75">IEUP</p>
@@ -28,19 +54,30 @@ export default function Sidebar({ activePage, onNavigate, onLogout }) {
         </div>
       </div>
 
+      {/* Datos del usuario logueado */}
+      <div className="px-4 py-3 border-b border-gold border-opacity-20">
+        <div className="flex items-center gap-2 mb-1">
+          <UserCircle size={20} className="text-gold" />
+          <p className="text-sm font-bold truncate">{usuario?.nombre || usuario?.email}</p>
+        </div>
+        {usuario?.nombre && (
+          <p className="text-xs text-cream opacity-70 truncate ml-7">{usuario.email}</p>
+        )}
+        <span className={`inline-block mt-2 px-2 py-1 text-xs font-bold rounded ${ROLES_COLOR[rol] || 'bg-gray-500'}`}>
+          {ROLES_LABEL[rol] || rol}
+        </span>
+      </div>
+
       <nav className="flex-1 overflow-y-auto p-4 space-y-2">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activePage === item.id;
-          
           return (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id)}
+              onClick={() => onNavigate && onNavigate(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all ${
-                isActive
-                  ? 'bg-gold text-navy font-bold'
-                  : 'text-cream hover:bg-navy-dark'
+                isActive ? 'bg-gold text-navy font-bold' : 'text-cream hover:bg-navy-dark'
               }`}
             >
               <Icon size={20} />
