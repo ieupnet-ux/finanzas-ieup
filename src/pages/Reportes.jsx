@@ -107,6 +107,7 @@ export default function Reportes() {
   const [cajaFiltro, setCajaFiltro] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState(''); // ingreso / egreso / ''
   const [conceptoFiltro, setConceptoFiltro] = useState('');
+  const [tipoTransFiltro, setTipoTransFiltro] = useState('');
   const [incluirSI, setIncluirSI] = useState(true);
 
   useEffect(() => { loadData(); }, []);
@@ -146,10 +147,11 @@ export default function Reportes() {
       if (cajaFiltro && (m.ubicacion || 'general') !== cajaFiltro) return false;
       if (tipoFiltro && m.tipo !== tipoFiltro) return false;
       if (conceptoFiltro && m.concepto !== conceptoFiltro) return false;
+      if (tipoTransFiltro && (m.tipo_transaccion || 'efectivo') !== tipoTransFiltro) return false;
       if (!incluirSI && esSaldoInicial(m)) return false;
       return true;
     });
-  }, [movimientos, moneda, periodo, desde, hasta, temploFiltro, cajaFiltro, tipoFiltro, conceptoFiltro, incluirSI]);
+  }, [movimientos, moneda, periodo, desde, hasta, temploFiltro, cajaFiltro, tipoFiltro, conceptoFiltro, tipoTransFiltro, incluirSI]);
 
   const stats = useMemo(() => {
     let ingresos = 0, egresos = 0;
@@ -199,6 +201,24 @@ export default function Reportes() {
     return Object.values(g).sort((a, b) => (b.ingresos - b.egresos) - (a.ingresos - a.egresos));
   }, [filtrados]);
 
+  // Resumen por medio de pago
+  const resumenTipoTrans = useMemo(() => {
+    const g = {};
+    const labels = {
+      'efectivo': 'Efectivo', 'deposito': 'Depósito Bancario',
+      'extraccion': 'Extracción Bancaria', 'plazo-fijo': 'Plazo Fijo',
+      'billetera-virtual': 'Billetera Virtual',
+    };
+    filtrados.forEach(m => {
+      const t = m.tipo_transaccion || 'efectivo';
+      const label = labels[t] || t;
+      if (!g[label]) g[label] = { tipo: label, ingresos: 0, egresos: 0 };
+      if (m.tipo === 'ingreso') g[label].ingresos += m.monto || 0;
+      else g[label].egresos += m.monto || 0;
+    });
+    return Object.values(g).sort((a, b) => (b.ingresos - b.egresos) - (a.ingresos - a.egresos));
+  }, [filtrados]);
+
   const fmt = (n) =>
     `${SYMBOLS[moneda] || '$'} ${(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -226,7 +246,7 @@ export default function Reportes() {
 
   const limpiarFiltros = () => {
     setPeriodo('este-anio'); setDesde(''); setHasta('');
-    setTemploFiltro(''); setCajaFiltro(''); setTipoFiltro(''); setConceptoFiltro('');
+    setTemploFiltro(''); setCajaFiltro(''); setTipoFiltro(''); setConceptoFiltro(''); setTipoTransFiltro('');
   };
 
   return (
@@ -261,7 +281,7 @@ export default function Reportes() {
         <h2 className="text-lg font-bold text-navy mb-3 flex items-center gap-2">
           <Filter size={20} /> Filtros
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <div>
             <label className="block text-xs font-bold text-navy mb-1">Período</label>
             <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="input-field w-full">
@@ -295,6 +315,17 @@ export default function Reportes() {
             <select value={conceptoFiltro} onChange={(e) => setConceptoFiltro(e.target.value)} className="input-field w-full">
               <option value="">Todos</option>
               {conceptosDisponibles.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-navy mb-1">Medio de Pago</label>
+            <select value={tipoTransFiltro} onChange={(e) => setTipoTransFiltro(e.target.value)} className="input-field w-full">
+              <option value="">Todos</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="deposito">Depósito Bancario</option>
+              <option value="extraccion">Extracción Bancaria</option>
+              <option value="plazo-fijo">Plazo Fijo</option>
+              <option value="billetera-virtual">Billetera Virtual</option>
             </select>
           </div>
         </div>
@@ -345,10 +376,11 @@ export default function Reportes() {
       ) : (
         <>
           {/* RESÚMENES */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
             <ResumenTabla titulo="Por Concepto" columna="concepto" data={resumenConcepto} keyField="concepto" fmt={fmt} />
             <ResumenTabla titulo="Por Templo" columna="templo" data={resumenTemplo} keyField="templo" fmt={fmt} />
             <ResumenTabla titulo="Por Caja" columna="caja" data={resumenCaja} keyField="caja" fmt={fmt} />
+            <ResumenTabla titulo="Por Medio de Pago" columna="tipo" data={resumenTipoTrans} keyField="tipo" fmt={fmt} />
           </div>
 
           {/* DETALLE */}
