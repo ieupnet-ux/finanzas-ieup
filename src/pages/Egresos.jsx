@@ -1,6 +1,18 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
 
+
+// Cargar TODAS las cajas activas desde Supabase (reemplaza el array hardcodeado)
+async function fetchCajas() {
+  const { data, error } = await supabase
+    .from('cajas')
+    .select('*')
+    .eq('activo', true)
+    .order('orden', { ascending: true });
+  if (error) { console.error('Error cargando cajas:', error); return []; }
+  return data || [];
+}
+
 // Traer TODOS los movimientos superando el límite de 1000 filas de Supabase
 async function fetchTodosMovimientos(tipo = null) {
   const LOTE = 1000;
@@ -70,6 +82,7 @@ function rangoPeriodo(periodo, desde, hasta) {
 export default function Egresos() {
   const [egresos, setEgresos] = useState([]);
   const [conceptos, setConceptos] = useState([]);
+  const [cajasBD, setCajasBD] = useState([]);
   const [templos, setTemplos] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -126,34 +139,11 @@ export default function Egresos() {
     { value: 'billetera-virtual', label: '📱 Billetera Virtual' }
   ];
 
-  const ubicaciones = [
-    // CAJAS
-    { value: 'adolescentes', label: '👦 Adolescentes' },
-    { value: 'ciclistas', label: '🚴 Ciclistas' },
-    { value: 'coro', label: '🎵 Coro' },
-    { value: 'coro-juvenil', label: '🎤 Coro Juvenil' },
-    { value: 'dorcas', label: '👵 Dorcas' },
-    { value: 'general', label: '💼 General' },
-    { value: 'jovenes', label: '👥 Jóvenes' },
-    { value: 'ninos', label: '👶 Niños' },
-    { value: 'porteras', label: '👩 Porteras' },
-    { value: 'porteros', label: '👨 Porteros' },
-    { value: 'emisora', label: '📻 Emisora' },
-    { value: 'cajas', label: '📦 Cajas' },
-    { value: 'reposteria', label: '🍰 Repostería' },
-    { value: 'secretaria', label: '📋 Secretaría' },
-    { value: 'kiosco', label: '🏪 Kiosco' },
-    { value: 'comedor', label: '🍽️ Comedor' },
-    { value: 'libreria', label: '📚 Librería' },
-    // BANCOS
-    { value: 'banco-nacion', label: '🏦 Banco Nación' },
-    { value: 'banco-macro', label: '🏦 Banco Macro' },
-    // OTROS
-    { value: 'plazo-fijo', label: '📅 Plazo Fijo' },
-    { value: 'mercado-pago', label: '📱 Mercado Pago' },
-    { value: 'billetera-virtual', label: '📱 Billetera Virtual' },
-    { value: 'otro', label: '❓ Otro' }
-  ];
+  // Cajas cargadas dinámicamente desde la BD
+  const ubicaciones = useMemo(
+    () => cajasBD.map(c => ({ value: c.valor, label: `${c.emoji || '📦'} ${c.nombre}` })),
+    [cajasBD]
+  );
 
   useEffect(() => {
     loadData();
@@ -170,6 +160,9 @@ export default function Egresos() {
 
     const { data: temp } = await supabase.from('templos').select('*');
     setTemplos(temp || []);
+
+    const cajas = await fetchCajas();
+    setCajasBD(cajas);
 
     const { data: conceptosData } = await supabase.from('conceptos').select('*');
     setConceptos(conceptosData || []);
