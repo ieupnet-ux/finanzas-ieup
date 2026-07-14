@@ -42,31 +42,11 @@ const TIPOS_TRANSACCION = [
   { value: 'billetera-virtual', label: 'Billetera Virtual' },
 ];
 
-const UBICACIONES = [
-  { value: 'adolescentes', label: 'Adolescentes' },
-  { value: 'ciclistas', label: 'Ciclistas' },
-  { value: 'coro', label: 'Coro' },
-  { value: 'coro-juvenil', label: 'Coro Juvenil' },
-  { value: 'dorcas', label: 'Dorcas' },
-  { value: 'general', label: 'General' },
-  { value: 'jovenes', label: 'Jóvenes' },
-  { value: 'ninos', label: 'Niños' },
-  { value: 'porteras', label: 'Porteras' },
-  { value: 'porteros', label: 'Porteros' },
-  { value: 'emisora', label: 'Emisora' },
-  { value: 'cajas', label: 'Cajas' },
-  { value: 'reposteria', label: 'Repostería' },
-  { value: 'secretaria', label: 'Secretaría' },
-  { value: 'kiosco', label: 'Kiosco' },
-  { value: 'comedor', label: 'Comedor' },
-  { value: 'libreria', label: 'Librería' },
-  { value: 'banco-nacion', label: 'Banco Nación' },
-  { value: 'banco-macro', label: 'Banco Macro' },
-  { value: 'plazo-fijo', label: 'Plazo Fijo' },
-  { value: 'mercado-pago', label: 'Mercado Pago' },
-  { value: 'billetera-virtual', label: 'Billetera Virtual' },
-  { value: 'otro', label: 'Otro' },
-];
+// Helper para cargar cajas dinámicas
+async function fetchCajas() {
+  const { data } = await supabase.from('cajas').select('*').eq('activo', true).order('orden');
+  return data || [];
+}
 
 const PERIODOS = [
   { value: 'este-mes', label: 'Este mes' },
@@ -118,6 +98,7 @@ function rangoPeriodo(periodo, desde, hasta) {
 export default function DashboardHome() {
   const [movimientos, setMovimientos] = useState([]);
   const [templos, setTemplos] = useState([]);
+  const [cajas, setCajas] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filtros
@@ -135,18 +116,26 @@ export default function DashboardHome() {
 
   const loadData = async () => {
     try {
-      const [movs, tempRes] = await Promise.all([
+      const [movs, tempRes, cajasData] = await Promise.all([
         fetchTodosMovimientos(),
         supabase.from('templos').select('*'),
+        fetchCajas(),
       ]);
       setMovimientos(movs);
       setTemplos(tempRes.data || []);
+      setCajas(cajasData);
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // UBICACIONES dinámico
+  const UBICACIONES = useMemo(
+    () => cajas.map(c => ({ value: c.valor, label: c.nombre })),
+    [cajas]
+  );
 
   const monedasDisponibles = useMemo(() => {
     const set = new Set(movimientos.map(m => m.moneda || 'ARS'));
