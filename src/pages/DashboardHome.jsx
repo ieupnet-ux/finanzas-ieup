@@ -34,6 +34,14 @@ const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'O
 const COLORS = ['#FFD700', '#C41E3A', '#001f3f', '#D4AF37', '#22c55e', '#3b82f6', '#a855f7', '#f97316', '#14b8a6', '#ec4899'];
 const SYMBOLS = { ARS: '$', USD: 'U$S', CLP: 'CLP $' };
 
+const TIPOS_TRANSACCION = [
+  { value: 'efectivo', label: 'Efectivo' },
+  { value: 'deposito', label: 'Depósito Bancario' },
+  { value: 'extraccion', label: 'Extracción Bancaria' },
+  { value: 'plazo-fijo', label: 'Plazo Fijo' },
+  { value: 'billetera-virtual', label: 'Billetera Virtual' },
+];
+
 const UBICACIONES = [
   { value: 'adolescentes', label: 'Adolescentes' },
   { value: 'ciclistas', label: 'Ciclistas' },
@@ -119,6 +127,7 @@ export default function DashboardHome() {
   const [hasta, setHasta] = useState('');
   const [temploFiltro, setTemploFiltro] = useState('');
   const [cajaFiltro, setCajaFiltro] = useState('');
+  const [tipoTransFiltro, setTipoTransFiltro] = useState('');
   const [metricaTC, setMetricaTC] = useState('ingresos'); // gráfico Templo × Caja
   const [incluirSI, setIncluirSI] = useState(true); // incluir Saldo Inicial
 
@@ -153,9 +162,10 @@ export default function DashboardHome() {
       if (f < ini || f > fin) return false;
       if (temploFiltro && m.templo_id !== temploFiltro) return false;
       if (cajaFiltro && (m.ubicacion || 'general') !== cajaFiltro) return false;
+      if (tipoTransFiltro && (m.tipo_transaccion || 'efectivo') !== tipoTransFiltro) return false;
       return true;
     });
-  }, [movimientos, moneda, periodo, desde, hasta, temploFiltro, cajaFiltro]);
+  }, [movimientos, moneda, periodo, desde, hasta, temploFiltro, cajaFiltro, tipoTransFiltro]);
 
   // Aplicar (o no) el Saldo Inicial según el interruptor
   const movsFiltrados = useMemo(
@@ -218,6 +228,41 @@ export default function DashboardHome() {
   };
   const distIngresos = useMemo(() => distribucion('ingreso'), [movsFiltrados]);
   const distEgresos = useMemo(() => distribucion('egreso'), [movsFiltrados]);
+
+  // Distribución por MEDIO DE PAGO (tipo_transaccion)
+  const distPorTipo = (tipo) => {
+    const porTipo = {};
+    movsFiltrados.forEach(m => {
+      if (m.tipo !== tipo) return;
+      const t = m.tipo_transaccion || 'efectivo';
+      const label = TIPOS_TRANSACCION.find(x => x.value === t)?.label || t;
+      porTipo[label] = (porTipo[label] || 0) + (m.monto || 0);
+    });
+    return Object.entries(porTipo).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  };
+  const tipoIngresos = useMemo(() => distPorTipo('ingreso'), [movsFiltrados]);
+  const tipoEgresos = useMemo(() => distPorTipo('egreso'), [movsFiltrados]);
+
+  // Caja × Medio de Pago (apilado): cada caja es una barra, segmentos por tipo de transacción
+  const [metricaCT, setMetricaCT] = useState('ingresos');
+  const cajaPorTipo = useMemo(() => {
+    const tipoTarget = metricaCT === 'ingresos' ? 'ingreso' : 'egreso';
+    const porCaja = {};
+    const tiposSet = new Set();
+    movsFiltrados.forEach(m => {
+      if (m.tipo !== tipoTarget) return;
+      const u = m.ubicacion || 'general';
+      const cajaLabel = UBICACIONES.find(x => x.value === u)?.label || u;
+      const t = m.tipo_transaccion || 'efectivo';
+      const tipoLabel = TIPOS_TRANSACCION.find(x => x.value === t)?.label || t;
+      tiposSet.add(tipoLabel);
+      if (!porCaja[cajaLabel]) porCaja[cajaLabel] = { caja: cajaLabel, __total: 0 };
+      porCaja[cajaLabel][tipoLabel] = (porCaja[cajaLabel][tipoLabel] || 0) + (m.monto || 0);
+      porCaja[cajaLabel].__total += (m.monto || 0);
+    });
+    const data = Object.values(porCaja).sort((a, b) => b.__total - a.__total);
+    return { data, tipos: [...tiposSet].sort() };
+  }, [movsFiltrados, metricaCT]);
 
   // Ingresos vs Egresos por Templo
   const porTemplo = useMemo(() => {
@@ -382,7 +427,7 @@ export default function DashboardHome() {
         <h2 className="text-lg font-bold text-navy mb-3 flex items-center gap-2">
           <Filter size={20} /> Filtros
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           <div>
             <label className="block text-xs font-bold text-navy mb-1">Período</label>
             <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="input-field w-full">
@@ -401,6 +446,13 @@ export default function DashboardHome() {
             <select value={cajaFiltro} onChange={(e) => setCajaFiltro(e.target.value)} className="input-field w-full">
               <option value="">Todas las cajas</option>
               {UBICACIONES.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-navy mb-1">Medio de Pago</label>
+            <select value={tipoTransFiltro} onChange={(e) => setTipoTransFiltro(e.target.value)} className="input-field w-full">
+              <option value="">Todos</option>
+              {TIPOS_TRANSACCION.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
           <div className="flex items-end">
@@ -583,6 +635,53 @@ export default function DashboardHome() {
                 </tbody>
               </table>
             </div>
+          </div>
+          {/* MEDIO DE PAGO */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PieCard titulo="Ingresos por Medio de Pago" data={tipoIngresos} fmt={fmt} />
+            <PieCard titulo="Egresos por Medio de Pago" data={tipoEgresos} fmt={fmt} />
+          </div>
+
+          {/* CAJA × MEDIO DE PAGO (APILADO) */}
+          <div className="card">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h2 className="text-xl font-bold text-navy">Cajas desglosadas por Medio de Pago</h2>
+              <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+                <button
+                  onClick={() => setMetricaCT('ingresos')}
+                  className={`px-4 py-2 rounded-md text-sm font-bold transition ${metricaCT === 'ingresos' ? 'bg-green-600 text-white shadow' : 'text-navy hover:bg-gray-200'}`}
+                >
+                  Ingresos
+                </button>
+                <button
+                  onClick={() => setMetricaCT('egresos')}
+                  className={`px-4 py-2 rounded-md text-sm font-bold transition ${metricaCT === 'egresos' ? 'bg-red-600 text-white shadow' : 'text-navy hover:bg-gray-200'}`}
+                >
+                  Egresos
+                </button>
+              </div>
+            </div>
+            {cajaPorTipo.data.length === 0 ? (
+              <p className="text-gray-500 text-center py-12">Sin datos en el período</p>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={Math.max(280, cajaPorTipo.data.length * 45)}>
+                  <BarChart data={cajaPorTipo.data} layout="vertical" margin={{ left: 10, right: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" tickFormatter={fmtCompacto} tick={{ fontSize: 12 }} />
+                    <YAxis type="category" dataKey="caja" width={110} tick={{ fontSize: 12 }} />
+                    <Tooltip formatter={(v) => fmt(v)} />
+                    <Legend />
+                    {cajaPorTipo.tipos.map((tipo, i) => (
+                      <Bar key={tipo} dataKey={tipo} stackId="ct" fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+                <p className="text-xs text-gray-500 mt-2">
+                  Cada barra es una caja; los segmentos de color indican qué proporción entró como efectivo, billetera virtual, etc.
+                </p>
+              </>
+            )}
           </div>
         </>
       )}
