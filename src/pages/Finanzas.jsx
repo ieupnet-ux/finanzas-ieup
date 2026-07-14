@@ -32,35 +32,18 @@ import { Wallet, Landmark, Smartphone, Filter, PiggyBank } from 'lucide-react';
 const SYMBOLS = { ARS: '$', USD: 'U$S', CLP: 'CLP $' };
 const COLORS = ['#FFD700', '#C41E3A', '#001f3f', '#D4AF37', '#22c55e', '#3b82f6', '#a855f7', '#f97316', '#14b8a6', '#ec4899'];
 
-const GRUPOS = {
-  cajas: {
-    titulo: 'Cajas',
-    icon: Wallet,
-    items: ['adolescentes', 'ciclistas', 'coro', 'coro-juvenil', 'dorcas', 'general', 'jovenes', 'ninos', 'porteras', 'porteros', 'emisora', 'cajas', 'reposteria', 'secretaria', 'kiosco', 'comedor', 'libreria'],
-  },
-  bancos: {
-    titulo: 'Bancos',
-    icon: Landmark,
-    items: ['banco-nacion', 'banco-macro'],
-  },
-  otros: {
-    titulo: 'Billeteras y Otros',
-    icon: Smartphone,
-    items: ['plazo-fijo', 'mercado-pago', 'billetera-virtual', 'otro'],
-  },
+// Iconos y títulos de cada grupo (los items se cargan de la BD)
+const GRUPOS_META = {
+  cajas: { titulo: 'Cajas', icon: Wallet },
+  bancos: { titulo: 'Bancos', icon: Landmark },
+  billeteras: { titulo: 'Billeteras y Otros', icon: Smartphone },
 };
 
-const LABELS = {
-  'adolescentes': 'Adolescentes', 'ciclistas': 'Ciclistas', 'coro': 'Coro',
-  'coro-juvenil': 'Coro Juvenil', 'dorcas': 'Dorcas', 'general': 'General',
-  'jovenes': 'Jóvenes', 'ninos': 'Niños', 'porteras': 'Porteras',
-  'porteros': 'Porteros', 'emisora': 'Emisora', 'cajas': 'Cajas',
-  'reposteria': 'Repostería', 'secretaria': 'Secretaría',
-  'kiosco': 'Kiosco', 'comedor': 'Comedor', 'libreria': 'Librería',
-  'banco-nacion': 'Banco Nación', 'banco-macro': 'Banco Macro',
-  'plazo-fijo': 'Plazo Fijo', 'mercado-pago': 'Mercado Pago',
-  'billetera-virtual': 'Billetera Virtual', 'otro': 'Otro',
-};
+// Helper para cargar cajas dinámicas
+async function fetchCajas() {
+  const { data } = await supabase.from('cajas').select('*').eq('activo', true).order('orden');
+  return data || [];
+}
 
 const PERIODOS = [
   { value: 'todo', label: 'Todo (saldo histórico)' },
@@ -109,6 +92,7 @@ function rangoPeriodo(periodo, desde, hasta) {
 export default function Finanzas() {
   const [movimientos, setMovimientos] = useState([]);
   const [templos, setTemplos] = useState([]);
+  const [cajas, setCajas] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [moneda, setMoneda] = useState('ARS');
@@ -122,18 +106,38 @@ export default function Finanzas() {
 
   const loadData = async () => {
     try {
-      const [movs, tempRes] = await Promise.all([
+      const [movs, tempRes, cajasData] = await Promise.all([
         fetchTodosMovimientos(),
         supabase.from('templos').select('*'),
+        fetchCajas(),
       ]);
       setMovimientos(movs);
       setTemplos(tempRes.data || []);
+      setCajas(cajasData);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
   };
+
+  // GRUPOS y LABELS derivados de las cajas de la BD
+  const GRUPOS = useMemo(() => {
+    const g = { cajas: { ...GRUPOS_META.cajas, items: [] },
+                bancos: { ...GRUPOS_META.bancos, items: [] },
+                otros: { ...GRUPOS_META.billeteras, items: [] } };
+    cajas.forEach(c => {
+      const target = c.grupo === 'billeteras' ? 'otros' : c.grupo;
+      if (g[target]) g[target].items.push(c.valor);
+    });
+    return g;
+  }, [cajas]);
+
+  const LABELS = useMemo(() => {
+    const l = {};
+    cajas.forEach(c => { l[c.valor] = c.nombre; });
+    return l;
+  }, [cajas]);
 
   const monedasDisponibles = useMemo(() => {
     const set = new Set(movimientos.map(m => m.moneda || 'ARS'));
