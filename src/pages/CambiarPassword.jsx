@@ -25,11 +25,8 @@ export default function CambiarPassword({ usuario, onSuccess, onLogout }) {
       const { error: updateError } = await supabase.auth.updateUser({ password: password1 });
       if (updateError) throw updateError;
 
-      // 2. Marcar el flag como false en la tabla usuarios
-      const { error: flagError } = await supabase
-        .from('usuarios')
-        .update({ debe_cambiar_password: false, updated_at: new Date().toISOString() })
-        .eq('id', usuario.id);
+      // 2. Marcar el flag como false (vía función segura, compatible con RLS)
+      const { error: flagError } = await supabase.rpc('marcar_password_cambiada');
       if (flagError) throw flagError;
 
       // 3. Refrescar y entrar a la app
