@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
+import ContarBilletes from '../components/ContarBilletes';
 
 
 // Cargar TODAS las cajas activas desde Supabase (reemplaza el array hardcodeado)
@@ -82,6 +83,7 @@ function rangoPeriodo(periodo, desde, hasta) {
 export default function Ingresos() {
   const [ingresos, setIngresos] = useState([]);
   const [conceptos, setConceptos] = useState([]);
+  const [contarAbierto, setContarAbierto] = useState(false);
   const [cajasBD, setCajasBD] = useState([]);
   const [templos, setTemplos] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -651,14 +653,29 @@ export default function Ingresos() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
-              type="number"
-              placeholder="Monto"
-              value={formData.monto}
-              onChange={(e) => setFormData({...formData, monto: e.target.value})}
-              className="input-field"
-              required
-            />
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-navy">Monto *</span>
+                {formData.tipo_transaccion === 'efectivo' && (
+                  <button
+                    type="button"
+                    onClick={() => setContarAbierto(true)}
+                    className="text-xs font-bold text-navy bg-gold hover:bg-yellow-400 px-2 py-0.5 rounded flex items-center gap-1"
+                    title="Abrir calculadora de billetes y monedas"
+                  >
+                    🧾 Contar
+                  </button>
+                )}
+              </div>
+              <input
+                type="number"
+                placeholder="Monto"
+                value={formData.monto}
+                onChange={(e) => setFormData({...formData, monto: e.target.value})}
+                className="input-field w-full"
+                required
+              />
+            </div>
             <select
               value={formData.concepto}
               onChange={(e) => setFormData({...formData, concepto: e.target.value})}
@@ -850,6 +867,20 @@ export default function Ingresos() {
           </div>
         )}
       </div>
+
+      <ContarBilletes
+        abierto={contarAbierto}
+        onCerrar={() => setContarAbierto(false)}
+        onConfirmar={(total, descripcion) => {
+          setFormData((prev) => ({
+            ...prev,
+            monto: total.toFixed(2),
+            detalle: prev.detalle
+              ? `${prev.detalle} | ${descripcion}`
+              : descripcion,
+          }));
+        }}
+      />
     </div>
   );
 }
