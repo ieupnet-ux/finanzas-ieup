@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
 import ContarBilletes from '../components/ContarBilletes';
+import TransferenciaAsistente from '../components/TransferenciaAsistente';
 
 
 // Cargar TODAS las cajas activas desde Supabase (reemplaza el array hardcodeado)
@@ -84,6 +85,7 @@ export default function Ingresos() {
   const [ingresos, setIngresos] = useState([]);
   const [conceptos, setConceptos] = useState([]);
   const [contarAbierto, setContarAbierto] = useState(false);
+  const [transferenciaAbierto, setTransferenciaAbierto] = useState(false);
   const [cajasBD, setCajasBD] = useState([]);
   const [templos, setTemplos] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -545,6 +547,12 @@ export default function Ingresos() {
             <Plus size={20} />
             Nuevo Ingreso
           </button>
+          <button
+            onClick={() => setTransferenciaAbierto(true)}
+            className="btn-secondary flex items-center gap-2"
+          >
+            🔄 Transferencia
+          </button>
         </div>
       </div>
 
@@ -880,6 +888,12 @@ export default function Ingresos() {
               : descripcion,
           }));
         }}
+      />
+
+      <TransferenciaAsistente
+        abierto={transferenciaAbierto}
+        onCerrar={() => setTransferenciaAbierto(false)}
+        onCreado={loadData}
       />
     </div>
   );
