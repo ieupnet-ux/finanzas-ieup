@@ -8,6 +8,7 @@ import Reportes from './Reportes';
 import Usuarios from './Usuarios';
 import Auditoria from './Auditoria';
 import Configuracion from './Configuracion';
+import Eventos from './Eventos';
 import { Menu } from 'lucide-react';
 
 export default function Dashboard({ usuario, isOnline, onLogout }) {
@@ -26,6 +27,7 @@ export default function Dashboard({ usuario, isOnline, onLogout }) {
     egresos: 'Egresos',
     finanzas: 'Finanzas',
     reportes: 'Reportes',
+    eventos: 'Eventos',
     usuarios: 'Usuarios',
     auditoria: 'Auditoría',
     configuracion: 'Configuración',
@@ -40,13 +42,14 @@ export default function Dashboard({ usuario, isOnline, onLogout }) {
       case 'reportes':      return <Reportes usuario={usuario} />;
       case 'usuarios':      return <Usuarios usuario={usuario} />;
       case 'auditoria':     return <Auditoria usuario={usuario} />;
+      case 'eventos':       return <Eventos usuario={usuario} />;
       case 'configuracion': return <Configuracion usuario={usuario} />;
       default:              return <DashboardHome usuario={usuario} />;
     }
   };
 
   return (
-    <div className="flex min-h-full bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar
         usuario={usuario}
         activePage={activePage}
