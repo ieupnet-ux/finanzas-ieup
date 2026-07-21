@@ -32,6 +32,20 @@ import { Wallet, Landmark, Smartphone, Filter, PiggyBank } from 'lucide-react';
 const SYMBOLS = { ARS: '$', USD: 'U$S', CLP: 'CLP $' };
 const COLORS = ['#FFD700', '#C41E3A', '#001f3f', '#D4AF37', '#22c55e', '#3b82f6', '#a855f7', '#f97316', '#14b8a6', '#ec4899'];
 
+
+// Conceptos que son movimientos internos (no crean ni destruyen valor)
+const CONCEPTOS_INTERNOS = new Set([
+  'Transferencia entre Cajas',
+  'Depósito Bancario',
+  'Extracción Bancaria',
+  'Movimiento entre Cuentas',
+  'Constitución de Plazo Fijo',
+  'Cierre de Plazo Fijo',
+  'Aporte a Fondo Común',
+  'Ajuste de Saldo',
+]);
+const esInterno = (m) => CONCEPTOS_INTERNOS.has(m.concepto);
+
 // Iconos y títulos de cada grupo (los items se cargan de la BD)
 const GRUPOS_META = {
   cajas: { titulo: 'Cajas', icon: Wallet },
@@ -101,6 +115,7 @@ export default function Finanzas() {
   const [hasta, setHasta] = useState('');
   const [temploFiltro, setTemploFiltro] = useState('');
   const [incluirSI, setIncluirSI] = useState(true);
+  const [incluirInternos, setIncluirInternos] = useState(true); // en Finanzas incluir por defecto (vista de tesorería)
 
   useEffect(() => { loadData(); }, []);
 
@@ -320,7 +335,17 @@ export default function Finanzas() {
             </span>
           )}
         </div>
-        <p className="text-xs text-gray-600 mt-3">
+        <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-blue-200">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={incluirSI} onChange={(e) => setIncluirSI(e.target.checked)} className="w-4 h-4 accent-[#001f3f]" />
+            <span className="text-sm font-bold text-navy">Incluir Saldo Inicial</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={incluirInternos} onChange={(e) => setIncluirInternos(e.target.checked)} className="w-4 h-4 accent-[#001f3f]" />
+            <span className="text-sm font-bold text-navy">Incluir transferencias internas</span>
+          </label>
+        </div>
+        <p className="text-xs text-gray-600 mt-2">
           💡 Con el período "Todo" ves el <strong>saldo real acumulado</strong> de cada caja. Con otros períodos ves solo el movimiento de ese lapso.
         </p>
       </div>
