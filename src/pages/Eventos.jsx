@@ -1,452 +1,278 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import Papa from 'papaparse';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell
-} from 'recharts';
-import {
-  Plus, X, Save, Edit2, Eye, EyeOff, FileText,
-  ArrowLeft, TrendingUp, TrendingDown, DollarSign, Calendar
-} from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { Calendar, ChevronLeft, Plus, Edit2, Save, X, TrendingUp, TrendingDown, DollarSign, FileText, Users } from 'lucide-react';
 
-// ── Constantes ──────────────────────────────────────────────
-const TIPOS_EVENTO = [
-  { value: 'conferencia-pastores',    label: 'Conferencia Anual de Pastores' },
-  { value: 'congreso-jovenes',        label: 'Congreso de Jóvenes' },
-  { value: 'congreso-supervisores',   label: 'Congreso de Supervisores' },
-  { value: 'congreso-dorcas',         label: 'Congreso de Dorcas' },
-  { value: 'otro',                    label: 'Otro evento' },
-];
-
-const TIPO_COLOR = {
-  'conferencia-pastores':  '#001f3f',
-  'congreso-jovenes':      '#2563eb',
-  'congreso-supervisores': '#7c3aed',
-  'congreso-dorcas':       '#db2777',
-  'otro':                  '#6b7280',
-};
-
-const COLORS = ['#001f3f','#FFD700','#2563eb','#7c3aed','#db2777','#16a34a','#ea580c','#0891b2'];
-
+const COLORS = ['#FFD700','#001F3F','#4CAF50','#F44336','#9C27B0','#FF9800','#2196F3','#795548'];
 const fmt = (n) => `$ ${Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-const fmtFecha = (s) => s ? new Date(s+'T00:00:00').toLocaleDateString('es-AR') : '—';
+const fmtC = (n) => { if(Math.abs(n)>=1000000) return `$${(n/1000000).toFixed(1)}M`; if(Math.abs(n)>=1000) return `$${(n/1000).toFixed(0)}k`; return `$${n}`; };
+const fmtF = (s) => s ? new Date(s+'T00:00:00').toLocaleDateString('es-AR') : '—';
 
-// ── Componente principal ────────────────────────────────────
+const Tarjeta = ({titulo,monto,icono:Icon,color}) => (
+  <div className={`card bg-gradient-to-br ${color} text-white`}>
+    <div className="flex items-center justify-between">
+      <div><p className="text-sm opacity-80">{titulo}</p><p className="text-2xl font-bold mt-1">{fmt(monto)}</p></div>
+      <Icon size={40} className="opacity-60" />
+    </div>
+  </div>
+);
+
 export default function Eventos({ usuario }) {
-  const puedeEditar = ['admin','tesorero'].includes(usuario?.rol);
-
-  const [eventos, setEventos]     = useState([]);
-  const [templos, setTemplos]     = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [mensaje, setMensaje]     = useState('');
-  const [eventoActivo, setEventoActivo] = useState(null); // detalle
-  const [formAbierto, setFormAbierto]   = useState(false);
-  const [editandoId, setEditandoId]     = useState(null);
-  const [form, setForm] = useState({
-    nombre:'', tipo:'conferencia-pastores', anio: new Date().getFullYear(),
-    fecha_inicio:'', fecha_fin:'', descripcion:'',
-  });
-
-  // Detalle del evento seleccionado
+  const [eventos, setEventos] = useState([]);
   const [movimientos, setMovimientos] = useState([]);
-  const [loadingMovs, setLoadingMovs] = useState(false);
+  const [templos, setTemplos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [eventoActivo, setEventoActivo] = useState(null);
+  const [mensaje, setMensaje] = useState('');
+  const [formAbierto, setFormAbierto] = useState(false);
+  const [editandoId, setEditandoId] = useState(null);
+  const [form, setForm] = useState({ nombre:'', descripcion:'', fecha_inicio:'', fecha_fin:'' });
+
+  const puedeEditar = ['admin','tesorero'].includes(usuario?.rol);
 
   useEffect(() => { cargar(); }, []);
 
   const cargar = async () => {
     setLoading(true);
-    const [evRes, tRes] = await Promise.all([
-      supabase.from('eventos').select('*').order('anio', { ascending: false }).order('fecha_inicio', { ascending: false }),
+    const [evRes, movRes, tempRes] = await Promise.all([
+      supabase.from('eventos').select('*').order('fecha_inicio', { ascending: false }),
+      supabase.from('movimientos').select('*').not('evento_id','is',null),
       supabase.from('templos').select('*').order('nombre'),
     ]);
     setEventos(evRes.data || []);
-    setTemplos(tRes.data || []);
+    setMovimientos(movRes.data || []);
+    setTemplos(tempRes.data || []);
     setLoading(false);
   };
 
-  const mostrarMensaje = (txt, ok = true) => {
-    setMensaje({ txt, ok });
-    setTimeout(() => setMensaje(''), 5000);
-  };
+  const msg = (txt) => { setMensaje(txt); setTimeout(()=>setMensaje(''),4000); };
 
-  // ── Abrir detalle de un evento ───────────────────────────
-  const abrirDetalle = async (evento) => {
-    setEventoActivo(evento);
-    setLoadingMovs(true);
-    const { data } = await supabase
-      .from('movimientos')
-      .select('*, templos(nombre)')
-      .eq('evento_id', evento.id)
-      .order('fecha');
-    setMovimientos(data || []);
-    setLoadingMovs(false);
-  };
+  const abrirNuevo = () => { setEditandoId(null); setForm({nombre:'',descripcion:'',fecha_inicio:'',fecha_fin:''}); setFormAbierto(true); };
+  const abrirEditar = (ev) => { setEditandoId(ev.id); setForm({nombre:ev.nombre,descripcion:ev.descripcion||'',fecha_inicio:ev.fecha_inicio||'',fecha_fin:ev.fecha_fin||''}); setFormAbierto(true); };
 
-  // ── Guardar evento ───────────────────────────────────────
   const guardar = async (e) => {
     e.preventDefault();
-    const datos = { ...form, updated_at: new Date().toISOString() };
-    if (editandoId) {
-      const { error } = await supabase.from('eventos').update(datos).eq('id', editandoId);
-      if (error) return mostrarMensaje('Error: ' + error.message, false);
-      mostrarMensaje('Evento actualizado');
-    } else {
-      const { error } = await supabase.from('eventos').insert({ ...datos, activo: true });
-      if (error) return mostrarMensaje('Error: ' + error.message, false);
-      mostrarMensaje('Evento creado');
-    }
+    if (!form.nombre.trim()) return msg('❌ El nombre es obligatorio');
+    const datos = { nombre:form.nombre.trim(), descripcion:form.descripcion.trim()||null, fecha_inicio:form.fecha_inicio||null, fecha_fin:form.fecha_fin||null, updated_at:new Date().toISOString() };
+    const { error } = editandoId
+      ? await supabase.from('eventos').update(datos).eq('id', editandoId)
+      : await supabase.from('eventos').insert(datos);
+    if (error) return msg('❌ ' + error.message);
+    msg(editandoId ? '✅ Evento actualizado' : '✅ Evento creado');
     setFormAbierto(false); setEditandoId(null);
     cargar();
   };
 
-  const abrirEditar = (ev) => {
-    setEditandoId(ev.id);
-    setForm({ nombre: ev.nombre, tipo: ev.tipo, anio: ev.anio,
-      fecha_inicio: ev.fecha_inicio || '', fecha_fin: ev.fecha_fin || '',
-      descripcion: ev.descripcion || '' });
-    setFormAbierto(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const movsEvento = useMemo(() => eventoActivo ? movimientos.filter(m => m.evento_id === eventoActivo.id) : [], [movimientos, eventoActivo]);
+  const totalIng = useMemo(() => movsEvento.filter(m=>m.tipo==='ingreso').reduce((s,m)=>s+m.monto,0), [movsEvento]);
+  const totalEgr = useMemo(() => movsEvento.filter(m=>m.tipo==='egreso').reduce((s,m)=>s+m.monto,0), [movsEvento]);
+  const saldo = totalIng - totalEgr;
 
-  const toggleActivo = async (ev) => {
-    await supabase.from('eventos').update({ activo: !ev.activo }).eq('id', ev.id);
-    cargar();
-  };
-
-  // ── Stats del evento activo ──────────────────────────────
-  const stats = useMemo(() => {
-    const ingresos = movimientos.filter(m => m.tipo === 'ingreso').reduce((s,m) => s + m.monto, 0);
-    const egresos  = movimientos.filter(m => m.tipo === 'egreso').reduce((s,m) => s + m.monto, 0);
-    return { ingresos, egresos, saldo: ingresos - egresos };
-  }, [movimientos]);
-
-  // Barras por templo
   const porTemplo = useMemo(() => {
     const g = {};
-    movimientos.forEach(m => {
-      const t = m.templos?.nombre || 'Sin templo';
-      if (!g[t]) g[t] = { templo: t, ingresos: 0, egresos: 0 };
-      if (m.tipo === 'ingreso') g[t].ingresos += m.monto;
-      else g[t].egresos += m.monto;
+    movsEvento.forEach(m => {
+      const t = templos.find(x=>x.id===m.templo_id)?.nombre || 'Sin templo';
+      if (!g[t]) g[t] = {templo:t,ingresos:0,egresos:0};
+      if (m.tipo==='ingreso') g[t].ingresos+=m.monto; else g[t].egresos+=m.monto;
     });
-    return Object.values(g).sort((a,b) => (b.ingresos+b.egresos)-(a.ingresos+a.egresos));
-  }, [movimientos]);
+    return Object.values(g).sort((a,b)=>(b.ingresos+b.egresos)-(a.ingresos+a.egresos));
+  }, [movsEvento, templos]);
 
-  // Torta de egresos por concepto
-  const tortaEgresos = useMemo(() => {
+  const egresosConcepto = useMemo(() => {
     const g = {};
-    movimientos.filter(m => m.tipo === 'egreso').forEach(m => {
-      g[m.concepto] = (g[m.concepto] || 0) + m.monto;
-    });
-    return Object.entries(g).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
-  }, [movimientos]);
+    movsEvento.filter(m=>m.tipo==='egreso').forEach(m => { g[m.concepto]=(g[m.concepto]||0)+m.monto; });
+    return Object.entries(g).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
+  }, [movsEvento]);
 
-  // Torta de ingresos por concepto
-  const tortaIngresos = useMemo(() => {
+  const ingresosConcepto = useMemo(() => {
     const g = {};
-    movimientos.filter(m => m.tipo === 'ingreso').forEach(m => {
-      g[m.concepto] = (g[m.concepto] || 0) + m.monto;
-    });
-    return Object.entries(g).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
-  }, [movimientos]);
+    movsEvento.filter(m=>m.tipo==='ingreso').forEach(m => { g[m.concepto]=(g[m.concepto]||0)+m.monto; });
+    return Object.entries(g).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
+  }, [movsEvento]);
 
-  // Exportar CSV del evento
+  const resumenEventos = useMemo(() => eventos.map(ev => {
+    const movs = movimientos.filter(m=>m.evento_id===ev.id);
+    const ing = movs.filter(m=>m.tipo==='ingreso').reduce((s,m)=>s+m.monto,0);
+    const egr = movs.filter(m=>m.tipo==='egreso').reduce((s,m)=>s+m.monto,0);
+    return {...ev, totalIngresos:ing, totalEgresos:egr, saldo:ing-egr, cantMovs:movs.length};
+  }), [eventos, movimientos]);
+
   const exportarCSV = () => {
-    const data = movimientos.map(m => ({
-      Fecha: fmtFecha(m.fecha?.split('T')[0]),
-      Templo: m.templos?.nombre || '',
-      Tipo: m.tipo,
-      Concepto: m.concepto,
-      Monto: m.monto,
-      Detalle: m.detalle || '',
+    const data = movsEvento.map(m => ({
+      Fecha: new Date(m.fecha+'T00:00:00').toLocaleDateString('es-AR'),
+      Tipo: m.tipo, Concepto: m.concepto, Monto: m.monto, Moneda: m.moneda,
+      Templo: templos.find(t=>t.id===m.templo_id)?.nombre||'—',
+      Caja: m.ubicacion, Detalle: m.detalle||'—',
     }));
-    const csv = Papa.unparse(data);
-    const blob = new Blob(['\ufeff'+csv], { type:'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${eventoActivo?.nombre?.replace(/\s+/g,'-')}.csv`;
-    link.click();
+    const blob = new Blob(['\ufeff'+Papa.unparse(data)],{type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `evento-${eventoActivo.nombre.replace(/\s/g,'-')}.csv`;
+    a.click();
   };
 
-  // ── VISTA DETALLE ────────────────────────────────────────
-  if (eventoActivo) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <button onClick={() => { setEventoActivo(null); setMovimientos([]); }}
-            className="btn-secondary flex items-center gap-2">
-            <ArrowLeft size={18} /> Volver
-          </button>
-          <div className="flex-1">
+  if (loading) return <div className="flex items-center justify-center py-24"><div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin" /></div>;
+
+  // ── DETALLE DEL EVENTO ────────────────────────────────────
+  if (eventoActivo) return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button onClick={()=>setEventoActivo(null)} className="p-2 hover:bg-gray-100 rounded-full"><ChevronLeft size={24} className="text-navy" /></button>
+          <div>
             <h1 className="text-3xl font-bold text-navy">{eventoActivo.nombre}</h1>
-            <p className="text-sm text-gray-500">
-              {TIPOS_EVENTO.find(t => t.value === eventoActivo.tipo)?.label}
-              {eventoActivo.fecha_inicio && ` · ${fmtFecha(eventoActivo.fecha_inicio)}`}
-              {eventoActivo.fecha_fin && ` — ${fmtFecha(eventoActivo.fecha_fin)}`}
-            </p>
+            {eventoActivo.descripcion && <p className="text-sm text-gray-600">{eventoActivo.descripcion}</p>}
+            {(eventoActivo.fecha_inicio||eventoActivo.fecha_fin) && (
+              <p className="text-xs text-gray-500 mt-1"><Calendar size={12} className="inline mr-1" />{fmtF(eventoActivo.fecha_inicio)}{eventoActivo.fecha_fin&&` → ${fmtF(eventoActivo.fecha_fin)}`}</p>
+            )}
           </div>
-          <button onClick={exportarCSV} className="btn-secondary flex items-center gap-2">
-            <FileText size={18} /> Exportar CSV
-          </button>
+        </div>
+        <button onClick={exportarCSV} className="btn-secondary flex items-center gap-2 text-sm"><FileText size={16}/>Exportar CSV</button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Tarjeta titulo="Total Ingresos" monto={totalIng} icono={TrendingUp} color="from-green-600 to-green-700" />
+        <Tarjeta titulo="Total Egresos" monto={totalEgr} icono={TrendingDown} color="from-red-600 to-red-700" />
+        <Tarjeta titulo="Saldo del Evento" monto={saldo} icono={DollarSign} color={saldo>=0?"from-navy to-navy-dark":"from-orange-600 to-orange-700"} />
+      </div>
+
+      {movsEvento.length === 0 ? (
+        <div className="card text-center py-12 text-gray-500">
+          <p>No hay movimientos asignados a este evento todavía.</p>
+          <p className="text-sm mt-2">Al cargar un ingreso o egreso, seleccioná este evento en el campo correspondiente.</p>
+        </div>
+      ) : (<>
+        <div className="card">
+          <h2 className="text-xl font-bold text-navy mb-4">Ingresos y Egresos por Templo</h2>
+          <ResponsiveContainer width="100%" height={Math.max(260,porTemplo.length*50)}>
+            <BarChart data={porTemplo} layout="vertical" margin={{left:10,right:20}}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" tickFormatter={fmtC} tick={{fontSize:11}} />
+              <YAxis type="category" dataKey="templo" width={110} tick={{fontSize:11}} />
+              <Tooltip formatter={v=>fmt(v)} />
+              <Legend />
+              <Bar dataKey="ingresos" name="Ingresos" fill="#4CAF50" radius={[0,4,4,0]} />
+              <Bar dataKey="egresos" name="Egresos" fill="#F44336" radius={[0,4,4,0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
-        {loadingMovs ? (
-          <div className="card text-center text-gray-500 py-8">Cargando movimientos...</div>
-        ) : (
-          <>
-            {/* Tarjetas resumen */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="card bg-gradient-to-br from-green-50 to-green-100">
-                <div className="flex items-center gap-3">
-                  <TrendingUp className="text-green-600" size={36} />
-                  <div>
-                    <p className="text-xs text-gray-600">Total Ingresos</p>
-                    <p className="text-2xl font-bold text-navy">{fmt(stats.ingresos)}</p>
-                    <p className="text-xs text-gray-500">{movimientos.filter(m=>m.tipo==='ingreso').length} movimientos</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[{titulo:'Ingresos por Concepto',data:ingresosConcepto,color:'text-green-700'},{titulo:'Egresos por Concepto',data:egresosConcepto,color:'text-red-700'}].map(({titulo,data,color})=>(
+            <div key={titulo} className="card">
+              <h2 className="text-xl font-bold text-navy mb-4">{titulo}</h2>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({percent})=>`${(percent*100).toFixed(0)}%`}>
+                    {data.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={v=>fmt(v)} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-2 space-y-1">
+                {data.map((d,i)=>(
+                  <div key={d.name} className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full" style={{background:COLORS[i%COLORS.length],display:'inline-block'}} />{d.name}</span>
+                    <span className={`font-bold ${color}`}>{fmt(d.value)}</span>
                   </div>
-                </div>
-              </div>
-              <div className="card bg-gradient-to-br from-red-50 to-red-100">
-                <div className="flex items-center gap-3">
-                  <TrendingDown className="text-red-600" size={36} />
-                  <div>
-                    <p className="text-xs text-gray-600">Total Egresos</p>
-                    <p className="text-2xl font-bold text-navy">{fmt(stats.egresos)}</p>
-                    <p className="text-xs text-gray-500">{movimientos.filter(m=>m.tipo==='egreso').length} movimientos</p>
-                  </div>
-                </div>
-              </div>
-              <div className={`card bg-gradient-to-br ${stats.saldo >= 0 ? 'from-blue-50 to-blue-100' : 'from-orange-50 to-orange-100'}`}>
-                <div className="flex items-center gap-3">
-                  <DollarSign className={stats.saldo >= 0 ? 'text-blue-600' : 'text-orange-600'} size={36} />
-                  <div>
-                    <p className="text-xs text-gray-600">Saldo del Evento</p>
-                    <p className={`text-2xl font-bold ${stats.saldo >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                      {stats.saldo >= 0 ? '+' : ''}{fmt(stats.saldo)}
-                    </p>
-                    <p className="text-xs text-gray-500">{stats.saldo >= 0 ? 'Superávit ✅' : 'Déficit ⚠️'}</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
+          ))}
+        </div>
 
-            {/* Gráfico Ingresos vs Egresos por templo */}
-            {porTemplo.length > 0 && (
-              <div className="card">
-                <h2 className="text-xl font-bold text-navy mb-4">Ingresos y Egresos por Templo</h2>
-                <ResponsiveContainer width="100%" height={Math.max(260, porTemplo.length * 50)}>
-                  <BarChart data={porTemplo} layout="vertical" margin={{ left: 10, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" tickFormatter={n => `$${(n/1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
-                    <YAxis type="category" dataKey="templo" width={120} tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={v => fmt(v)} />
-                    <Legend />
-                    <Bar dataKey="ingresos" name="Ingresos" fill="#16a34a" radius={[0,4,4,0]} />
-                    <Bar dataKey="egresos" name="Egresos" fill="#dc2626" radius={[0,4,4,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+        <div className="card">
+          <h2 className="text-xl font-bold text-navy mb-4">Movimientos del Evento <span className="text-sm font-normal text-gray-500">({movsEvento.length})</span></h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-gold">
+                  {['Fecha','Tipo','Concepto','Monto','Templo','Detalle'].map(h=><th key={h} className={`p-2 text-navy font-bold ${h==='Monto'?'text-right':'text-left'}`}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {[...movsEvento].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).map(m=>(
+                  <tr key={m.id} className="border-b hover:bg-gray-50">
+                    <td className="p-2 text-xs whitespace-nowrap">{fmtF(m.fecha)}</td>
+                    <td className="p-2"><span className={`px-2 py-0.5 rounded text-xs font-bold text-white ${m.tipo==='ingreso'?'bg-green-500':'bg-red-500'}`}>{m.tipo==='ingreso'?'ING':'EGR'}</span></td>
+                    <td className="p-2 text-xs">{m.concepto}</td>
+                    <td className={`p-2 text-right font-mono text-sm font-bold ${m.tipo==='ingreso'?'text-green-700':'text-red-700'}`}>{m.tipo==='egreso'?'-':''}{fmt(m.monto)}</td>
+                    <td className="p-2 text-xs">{templos.find(t=>t.id===m.templo_id)?.nombre||'—'}</td>
+                    <td className="p-2 text-xs text-gray-600 max-w-xs truncate">{m.detalle||'—'}</td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-navy bg-gray-50 font-bold">
+                  <td colSpan={3} className="p-2 text-right text-navy text-sm">TOTALES</td>
+                  <td className="p-2 text-right font-mono">
+                    <div className="text-green-700 text-xs">↑ {fmt(totalIng)}</div>
+                    <div className="text-red-700 text-xs">↓ {fmt(totalEgr)}</div>
+                    <div className={`text-sm ${saldo>=0?'text-navy':'text-orange-700'}`}>{fmt(saldo)}</div>
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </>)}
+    </div>
+  );
 
-            {/* Tortas */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {tortaIngresos.length > 0 && (
-                <div className="card">
-                  <h2 className="text-lg font-bold text-navy mb-3">Ingresos por Concepto</h2>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <PieChart>
-                      <Pie data={tortaIngresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
-                        {tortaIngresos.map((_,i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip formatter={v => fmt(v)} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-              {tortaEgresos.length > 0 && (
-                <div className="card">
-                  <h2 className="text-lg font-bold text-navy mb-3">Egresos por Concepto</h2>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <PieChart>
-                      <Pie data={tortaEgresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
-                        {tortaEgresos.map((_,i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip formatter={v => fmt(v)} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
-
-            {/* Tabla detallada */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-navy mb-4">
-                Movimientos del Evento <span className="text-sm font-normal text-gray-500">({movimientos.length})</span>
-              </h2>
-              {movimientos.length === 0 ? (
-                <p className="text-gray-500 text-center py-6">No hay movimientos asignados a este evento.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b-2 border-gold">
-                        <th className="text-left p-2 text-navy font-bold">Fecha</th>
-                        <th className="text-left p-2 text-navy font-bold">Templo</th>
-                        <th className="text-left p-2 text-navy font-bold">Tipo</th>
-                        <th className="text-left p-2 text-navy font-bold">Concepto</th>
-                        <th className="text-right p-2 text-navy font-bold">Monto</th>
-                        <th className="text-left p-2 text-navy font-bold">Detalle</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {movimientos.map((m, i) => (
-                        <tr key={m.id} className={`border-b hover:bg-gray-50 ${i%2===1?'bg-gray-50':''}`}>
-                          <td className="p-2 text-xs whitespace-nowrap">{fmtFecha(m.fecha?.split('T')[0])}</td>
-                          <td className="p-2 text-xs">{m.templos?.nombre || '—'}</td>
-                          <td className="p-2">
-                            <span className={`px-2 py-0.5 rounded text-xs font-bold text-white ${m.tipo==='ingreso'?'bg-green-500':'bg-red-500'}`}>
-                              {m.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}
-                            </span>
-                          </td>
-                          <td className="p-2 text-xs">{m.concepto}</td>
-                          <td className={`p-2 text-right font-mono text-xs ${m.tipo==='ingreso'?'text-green-700':'text-red-700'}`}>
-                            {m.tipo==='ingreso'?'+':'-'}{fmt(m.monto)}
-                          </td>
-                          <td className="p-2 text-xs text-gray-500 max-w-xs truncate">{m.detalle || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t-2 border-gold font-bold bg-gray-50">
-                        <td colSpan={4} className="p-2 text-navy">TOTAL</td>
-                        <td className="p-2 text-right font-mono text-sm">
-                          <span className="text-green-700 block">+{fmt(stats.ingresos)}</span>
-                          <span className="text-red-700 block">-{fmt(stats.egresos)}</span>
-                          <span className={`block border-t mt-1 pt-1 ${stats.saldo>=0?'text-green-700':'text-red-700'}`}>{fmt(stats.saldo)}</span>
-                        </td>
-                        <td></td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  // ── VISTA LISTA DE EVENTOS ───────────────────────────────
+  // ── LISTA DE EVENTOS ──────────────────────────────────────
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-4xl font-bold text-navy">Eventos</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-navy">Eventos</h1>
           <p className="text-sm text-gray-600">Conferencias y congresos de la IEUP</p>
         </div>
-        {puedeEditar && (
-          <button onClick={() => { setEditandoId(null); setForm({ nombre:'', tipo:'conferencia-pastores', anio: new Date().getFullYear(), fecha_inicio:'', fecha_fin:'', descripcion:'' }); setFormAbierto(true); window.scrollTo({top:0,behavior:'smooth'}); }}
-            className="btn-primary flex items-center gap-2">
-            <Plus size={20} /> Nuevo Evento
-          </button>
-        )}
+        {puedeEditar && <button onClick={abrirNuevo} className="btn-primary flex items-center gap-2"><Plus size={20}/>Nuevo Evento</button>}
       </div>
 
-      {mensaje && (
-        <div className={`card ${mensaje.ok ? 'bg-green-50 border-l-4 border-green-500 text-green-800' : 'bg-red-50 border-l-4 border-red-500 text-red-800'}`}>
-          {mensaje.txt}
-        </div>
-      )}
+      {mensaje && <div className={`card ${mensaje.startsWith('✅')?'bg-green-50 border-l-4 border-green-500 text-green-800':'bg-red-50 border-l-4 border-red-500 text-red-800'}`}>{mensaje}</div>}
 
-      {/* Formulario */}
       {formAbierto && puedeEditar && (
         <form onSubmit={guardar} className="card bg-blue-50 border-l-4 border-blue-500 space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-navy">{editandoId ? 'Editar Evento' : 'Nuevo Evento'}</h2>
-            <button type="button" onClick={() => { setFormAbierto(false); setEditandoId(null); }} className="text-gray-500 hover:text-gray-700"><X size={22}/></button>
+            <h2 className="text-xl font-bold text-navy">{editandoId?'Editar Evento':'Nuevo Evento'}</h2>
+            <button type="button" onClick={()=>{setFormAbierto(false);setEditandoId(null);}} className="text-gray-500 hover:text-gray-700"><X size={22}/></button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-navy mb-1">Nombre del evento *</label>
-              <input type="text" value={form.nombre} onChange={e => setForm({...form, nombre:e.target.value})} placeholder="Ej: Conferencia IEUP 2027" className="input-field w-full" required />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-navy mb-1">Año *</label>
-              <input type="number" value={form.anio} onChange={e => setForm({...form, anio:parseInt(e.target.value)})} className="input-field w-full" required />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-navy mb-1">Tipo *</label>
-              <select value={form.tipo} onChange={e => setForm({...form, tipo:e.target.value})} className="input-field w-full" required>
-                {TIPOS_EVENTO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-navy mb-1">Fecha inicio</label>
-              <input type="date" value={form.fecha_inicio} onChange={e => setForm({...form, fecha_inicio:e.target.value})} className="input-field w-full" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-navy mb-1">Fecha fin</label>
-              <input type="date" value={form.fecha_fin} onChange={e => setForm({...form, fecha_fin:e.target.value})} className="input-field w-full" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-navy mb-1">Descripción (opcional)</label>
-            <input type="text" value={form.descripcion} onChange={e => setForm({...form, descripcion:e.target.value})} placeholder="Notas adicionales sobre el evento" className="input-field w-full" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div><label className="block text-xs font-bold text-navy mb-1">Nombre *</label><input type="text" value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder="Conferencia IEUP 2027" className="input-field w-full" required /></div>
+            <div><label className="block text-xs font-bold text-navy mb-1">Descripción</label><input type="text" value={form.descripcion} onChange={e=>setForm(f=>({...f,descripcion:e.target.value}))} placeholder="Descripción opcional" className="input-field w-full" /></div>
+            <div><label className="block text-xs font-bold text-navy mb-1">Fecha inicio</label><input type="date" value={form.fecha_inicio} onChange={e=>setForm(f=>({...f,fecha_inicio:e.target.value}))} className="input-field w-full" /></div>
+            <div><label className="block text-xs font-bold text-navy mb-1">Fecha fin</label><input type="date" value={form.fecha_fin} onChange={e=>setForm(f=>({...f,fecha_fin:e.target.value}))} className="input-field w-full" /></div>
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="btn-primary flex items-center gap-2"><Save size={18}/>{editandoId ? 'Actualizar' : 'Crear evento'}</button>
-            <button type="button" onClick={() => { setFormAbierto(false); setEditandoId(null); }} className="btn-secondary">Cancelar</button>
+            <button type="submit" className="btn-primary flex items-center gap-2"><Save size={18}/>{editandoId?'Actualizar':'Crear'}</button>
+            <button type="button" onClick={()=>{setFormAbierto(false);setEditandoId(null);}} className="btn-secondary">Cancelar</button>
           </div>
         </form>
       )}
 
-      {/* Lista de eventos */}
-      {loading ? (
-        <div className="card text-center text-gray-500 py-8">Cargando...</div>
-      ) : eventos.length === 0 ? (
-        <div className="card text-center text-gray-500 py-8">No hay eventos registrados.</div>
+      {resumenEventos.length === 0 ? (
+        <div className="card text-center py-12 text-gray-500"><Users size={48} className="mx-auto mb-3 opacity-30"/><p>No hay eventos cargados</p></div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {eventos.map(ev => {
-            const color = TIPO_COLOR[ev.tipo] || '#6b7280';
-            const tipoLabel = TIPOS_EVENTO.find(t => t.value === ev.tipo)?.label || ev.tipo;
-            return (
-              <div key={ev.id} className={`card border-l-4 cursor-pointer hover:shadow-lg transition-shadow ${!ev.activo ? 'opacity-50' : ''}`}
-                style={{ borderColor: color }}
-                onClick={() => ev.activo && abrirDetalle(ev)}>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ backgroundColor: color }}>{ev.anio}</span>
-                      <span className="text-xs text-gray-500">{tipoLabel}</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-navy">{ev.nombre}</h3>
-                    {(ev.fecha_inicio || ev.fecha_fin) && (
-                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                        <Calendar size={12} />
-                        {ev.fecha_inicio && fmtFecha(ev.fecha_inicio)}
-                        {ev.fecha_fin && ` — ${fmtFecha(ev.fecha_fin)}`}
-                      </div>
-                    )}
-                    {ev.descripcion && <p className="text-xs text-gray-600 mt-1">{ev.descripcion}</p>}
-                  </div>
-                  {puedeEditar && (
-                    <div className="flex gap-1 ml-2" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => abrirEditar(ev)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded" title="Editar"><Edit2 size={15}/></button>
-                      <button onClick={() => toggleActivo(ev)} className={`p-1.5 rounded ${ev.activo ? 'text-orange-600 hover:bg-orange-100' : 'text-green-600 hover:bg-green-100'}`} title={ev.activo ? 'Desactivar' : 'Reactivar'}>{ev.activo ? <EyeOff size={15}/> : <Eye size={15}/>}</button>
-                    </div>
-                  )}
+          {resumenEventos.map(ev=>(
+            <div key={ev.id} className="card cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-gold" onClick={()=>setEventoActivo(ev)}>
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-navy">{ev.nombre}</h3>
+                  {ev.descripcion && <p className="text-xs text-gray-500 mt-0.5">{ev.descripcion}</p>}
+                  {(ev.fecha_inicio||ev.fecha_fin) && <p className="text-xs text-gray-400 mt-1"><Calendar size={11} className="inline mr-1"/>{fmtF(ev.fecha_inicio)}{ev.fecha_fin&&` → ${fmtF(ev.fecha_fin)}`}</p>}
                 </div>
-                {ev.activo && (
-                  <p className="text-xs text-blue-600 font-medium mt-2">Click para ver el detalle →</p>
-                )}
+                {puedeEditar && <button onClick={e=>{e.stopPropagation();abrirEditar(ev);}} className="p-1.5 text-gray-400 hover:text-navy hover:bg-gray-100 rounded ml-2"><Edit2 size={16}/></button>}
               </div>
-            );
-          })}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-green-50 rounded p-2"><p className="text-xs text-gray-500">Ingresos</p><p className="text-sm font-bold text-green-700">{fmt(ev.totalIngresos)}</p></div>
+                <div className="bg-red-50 rounded p-2"><p className="text-xs text-gray-500">Egresos</p><p className="text-sm font-bold text-red-700">{fmt(ev.totalEgresos)}</p></div>
+                <div className={`rounded p-2 ${ev.saldo>=0?'bg-blue-50':'bg-orange-50'}`}><p className="text-xs text-gray-500">Saldo</p><p className={`text-sm font-bold ${ev.saldo>=0?'text-navy':'text-orange-700'}`}>{fmt(ev.saldo)}</p></div>
+              </div>
+              <p className="text-xs text-gray-400 mt-2 text-right">{ev.cantMovs} movimientos · Click para ver detalle →</p>
+            </div>
+          ))}
         </div>
       )}
     </div>
