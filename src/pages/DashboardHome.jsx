@@ -42,11 +42,31 @@ const TIPOS_TRANSACCION = [
   { value: 'billetera-virtual', label: 'Billetera Virtual' },
 ];
 
-// Helper para cargar cajas dinámicas
-async function fetchCajas() {
-  const { data } = await supabase.from('cajas').select('*').eq('activo', true).order('orden');
-  return data || [];
-}
+const UBICACIONES = [
+  { value: 'adolescentes', label: 'Adolescentes' },
+  { value: 'ciclistas', label: 'Ciclistas' },
+  { value: 'coro', label: 'Coro' },
+  { value: 'coro-juvenil', label: 'Coro Juvenil' },
+  { value: 'dorcas', label: 'Dorcas' },
+  { value: 'general', label: 'General' },
+  { value: 'jovenes', label: 'Jóvenes' },
+  { value: 'ninos', label: 'Niños' },
+  { value: 'porteras', label: 'Porteras' },
+  { value: 'porteros', label: 'Porteros' },
+  { value: 'emisora', label: 'Emisora' },
+  { value: 'cajas', label: 'Cajas' },
+  { value: 'reposteria', label: 'Repostería' },
+  { value: 'secretaria', label: 'Secretaría' },
+  { value: 'kiosco', label: 'Kiosco' },
+  { value: 'comedor', label: 'Comedor' },
+  { value: 'libreria', label: 'Librería' },
+  { value: 'banco-nacion', label: 'Banco Nación' },
+  { value: 'banco-macro', label: 'Banco Macro' },
+  { value: 'plazo-fijo', label: 'Plazo Fijo' },
+  { value: 'mercado-pago', label: 'Mercado Pago' },
+  { value: 'billetera-virtual', label: 'Billetera Virtual' },
+  { value: 'otro', label: 'Otro' },
+];
 
 const PERIODOS = [
   { value: 'este-mes', label: 'Este mes' },
@@ -65,6 +85,20 @@ function parseFechaLocal(fecha) {
   return new Date(y, (m || 1) - 1, d || 1);
 }
 
+
+
+// Conceptos que son movimientos internos (no crean ni destruyen valor)
+const CONCEPTOS_INTERNOS = new Set([
+  'Transferencia entre Cajas',
+  'Depósito Bancario',
+  'Extracción Bancaria',
+  'Movimiento entre Cuentas',
+  'Constitución de Plazo Fijo',
+  'Cierre de Plazo Fijo',
+  'Aporte a Fondo Común',
+  'Ajuste de Saldo',
+]);
+const esInterno = (m) => CONCEPTOS_INTERNOS.has(m.concepto);
 
 // Detectar movimientos de Saldo Inicial (apertura)
 const esSaldoInicial = (m) => (m.concepto || '').trim().toLowerCase() === 'saldo inicial';
@@ -98,7 +132,6 @@ function rangoPeriodo(periodo, desde, hasta) {
 export default function DashboardHome() {
   const [movimientos, setMovimientos] = useState([]);
   const [templos, setTemplos] = useState([]);
-  const [cajas, setCajas] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filtros
@@ -111,31 +144,24 @@ export default function DashboardHome() {
   const [tipoTransFiltro, setTipoTransFiltro] = useState('');
   const [metricaTC, setMetricaTC] = useState('ingresos'); // gráfico Templo × Caja
   const [incluirSI, setIncluirSI] = useState(true); // incluir Saldo Inicial
+  const [incluirInternos, setIncluirInternos] = useState(false); // excluir internos por defecto
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     try {
-      const [movs, tempRes, cajasData] = await Promise.all([
+      const [movs, tempRes] = await Promise.all([
         fetchTodosMovimientos(),
         supabase.from('templos').select('*'),
-        fetchCajas(),
       ]);
       setMovimientos(movs);
       setTemplos(tempRes.data || []);
-      setCajas(cajasData);
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
   };
-
-  // UBICACIONES dinámico
-  const UBICACIONES = useMemo(
-    () => cajas.map(c => ({ value: c.valor, label: c.nombre })),
-    [cajas]
-  );
 
   const monedasDisponibles = useMemo(() => {
     const set = new Set(movimientos.map(m => m.moneda || 'ARS'));
@@ -156,10 +182,18 @@ export default function DashboardHome() {
     });
   }, [movimientos, moneda, periodo, desde, hasta, temploFiltro, cajaFiltro, tipoTransFiltro]);
 
-  // Aplicar (o no) el Saldo Inicial según el interruptor
-  const movsFiltrados = useMemo(
-    () => incluirSI ? movsFiltradosBase : movsFiltradosBase.filter(m => !esSaldoInicial(m)),
-    [movsFiltradosBase, incluirSI]
+  // Aplicar (o no) el Saldo Inicial y los movimientos internos
+  const movsFiltrados = useMemo(() => {
+    let res = movsFiltradosBase;
+    if (!incluirSI) res = res.filter(m => !esSaldoInicial(m));
+    if (!incluirInternos) res = res.filter(m => !esInterno(m));
+    return res;
+  }, [movsFiltradosBase, incluirSI, incluirInternos]);
+
+  // Total de internos en el período (para informar al usuario)
+  const totalInternos = useMemo(
+    () => movsFiltradosBase.filter(esInterno).reduce((s, m) => s + (m.tipo === 'ingreso' ? m.monto : 0), 0),
+    [movsFiltradosBase]
   );
 
   // Monto de Saldo Inicial presente en el período (para informar al usuario)
@@ -472,8 +506,23 @@ export default function DashboardHome() {
           </label>
           {totalSaldoInicial > 0 && (
             <span className="text-sm text-gray-700">
-              Saldo Inicial en el período: <strong>{fmt(totalSaldoInicial)}</strong>
-              {!incluirSI && ' (excluido de los cálculos)'}
+              Saldo Inicial: <strong>{fmt(totalSaldoInicial)}</strong>
+              {!incluirSI && ' (excluido)'}
+            </span>
+          )}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={incluirInternos}
+              onChange={(e) => setIncluirInternos(e.target.checked)}
+              className="w-4 h-4 accent-[#001f3f]"
+            />
+            <span className="text-sm font-bold text-navy">Incluir transferencias internas</span>
+          </label>
+          {totalInternos > 0 && (
+            <span className="text-sm text-gray-700">
+              Internos: <strong>{fmt(totalInternos)}</strong>
+              {!incluirInternos ? ' (excluidos — vista de valores reales)' : ' (incluidos)'}
             </span>
           )}
         </div>
