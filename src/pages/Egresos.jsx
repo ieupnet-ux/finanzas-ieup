@@ -87,6 +87,7 @@ export default function Egresos() {
   const [contarAbierto, setContarAbierto] = useState(false);
   const [transferenciaAbierto, setTransferenciaAbierto] = useState(false);
   const [cajasBD, setCajasBD] = useState([]);
+  const [eventosBD, setEventosBD] = useState([]);
   const [templos, setTemplos] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -124,6 +125,7 @@ export default function Egresos() {
     templo: '',
     moneda: 'ARS',
     tipo_transaccion: 'efectivo',
+    evento_id: '',
     ubicacion: 'general',
     detalle: '',
     fecha: new Date().toISOString().split('T')[0]
@@ -168,6 +170,9 @@ export default function Egresos() {
     const cajas = await fetchCajas();
     setCajasBD(cajas);
 
+    const { data: evs } = await supabase.from('eventos').select('id, nombre').order('nombre');
+    setEventosBD(evs || []);
+
     const { data: conceptosData } = await supabase.from('conceptos').select('*');
     setConceptos(conceptosData || []);
   };
@@ -194,6 +199,7 @@ export default function Egresos() {
         templo_id: formData.templo || null,
         moneda: formData.moneda,
         tipo_transaccion: formData.tipo_transaccion,
+        evento_id: formData.evento_id || null,
         ubicacion: formData.ubicacion,
         detalle: formData.detalle,
         fecha: formData.fecha
@@ -214,6 +220,7 @@ export default function Egresos() {
         templo_id: formData.templo || null,
         moneda: formData.moneda,
         tipo_transaccion: formData.tipo_transaccion,
+        evento_id: formData.evento_id || null,
         ubicacion: formData.ubicacion,
         detalle: formData.detalle,
         tipo: 'egreso',
@@ -229,7 +236,8 @@ export default function Egresos() {
     
     setFormData({ 
       monto: '', concepto: '', templo: '', moneda: 'ARS', 
-      tipo_transaccion: 'efectivo', ubicacion: 'general', 
+      tipo_transaccion: 'efectivo',
+    evento_id: '', ubicacion: 'general', 
       detalle: '', fecha: new Date().toISOString().split('T')[0] 
     });
     setShowForm(false);
@@ -538,7 +546,8 @@ export default function Egresos() {
               if (!showForm) setEditingId(null);
               setFormData({ 
                 monto: '', concepto: '', templo: '', moneda: 'ARS', 
-                tipo_transaccion: 'efectivo', ubicacion: 'general', 
+                tipo_transaccion: 'efectivo',
+    evento_id: '', ubicacion: 'general', 
                 detalle: '', fecha: new Date().toISOString().split('T')[0] 
               });
             }}
@@ -749,6 +758,18 @@ export default function Egresos() {
               className="input-field w-full"
             />
           </div>
+          {eventosBD.length > 0 && (
+            <div className="mt-3">
+              <select
+                value={formData.evento_id}
+                onChange={(e) => setFormData({...formData, evento_id: e.target.value})}
+                className="input-field w-full"
+              >
+                <option value="">🎪 Evento (opcional)</option>
+                {eventosBD.map(ev => <option key={ev.id} value={ev.id}>{ev.nombre}</option>)}
+              </select>
+            </div>
+          )}
 
           <div className="mt-4">
             <input
