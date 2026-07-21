@@ -28,6 +28,20 @@ import Papa from 'papaparse';
 
 const SYMBOLS = { ARS: '$', USD: 'U$S', CLP: 'CLP $' };
 
+
+// Conceptos que son movimientos internos (no crean ni destruyen valor)
+const CONCEPTOS_INTERNOS = new Set([
+  'Transferencia entre Cajas',
+  'Depósito Bancario',
+  'Extracción Bancaria',
+  'Movimiento entre Cuentas',
+  'Constitución de Plazo Fijo',
+  'Cierre de Plazo Fijo',
+  'Aporte a Fondo Común',
+  'Ajuste de Saldo',
+]);
+const esInterno = (m) => CONCEPTOS_INTERNOS.has(m.concepto);
+
 // Helper para cargar cajas dinámicas
 async function fetchCajas() {
   const { data } = await supabase.from('cajas').select('*').eq('activo', true).order('orden');
@@ -104,6 +118,7 @@ export default function Reportes() {
   const [conceptoFiltro, setConceptoFiltro] = useState('');
   const [tipoTransFiltro, setTipoTransFiltro] = useState('');
   const [incluirSI, setIncluirSI] = useState(true);
+  const [incluirInternos, setIncluirInternos] = useState(false); // excluir por defecto
 
   useEffect(() => { loadData(); }, []);
 
@@ -153,9 +168,10 @@ export default function Reportes() {
       if (conceptoFiltro && m.concepto !== conceptoFiltro) return false;
       if (tipoTransFiltro && (m.tipo_transaccion || 'efectivo') !== tipoTransFiltro) return false;
       if (!incluirSI && esSaldoInicial(m)) return false;
+      if (!incluirInternos && esInterno(m)) return false;
       return true;
     });
-  }, [movimientos, moneda, periodo, desde, hasta, temploFiltro, cajaFiltro, tipoFiltro, conceptoFiltro, tipoTransFiltro, incluirSI]);
+  }, [movimientos, moneda, periodo, desde, hasta, temploFiltro, cajaFiltro, tipoFiltro, conceptoFiltro, tipoTransFiltro, incluirSI, incluirInternos]);
 
   const stats = useMemo(() => {
     let ingresos = 0, egresos = 0;
@@ -348,14 +364,16 @@ export default function Reportes() {
         <div className="mt-3 flex flex-wrap items-center gap-4">
           <button onClick={limpiarFiltros} className="btn-secondary">Limpiar filtros</button>
           <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={incluirSI}
-              onChange={(e) => setIncluirSI(e.target.checked)}
-              className="w-4 h-4 accent-[#001f3f]"
-            />
+            <input type="checkbox" checked={incluirSI} onChange={(e) => setIncluirSI(e.target.checked)} className="w-4 h-4 accent-[#001f3f]" />
             <span className="text-sm font-bold text-navy">Incluir Saldo Inicial</span>
           </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={incluirInternos} onChange={(e) => setIncluirInternos(e.target.checked)} className="w-4 h-4 accent-[#001f3f]" />
+            <span className="text-sm font-bold text-navy">Incluir transferencias internas</span>
+          </label>
+          {!incluirInternos && (
+            <span className="text-xs text-green-700 font-medium">✓ Vista de valores reales</span>
+          )}
         </div>
       </div>
 
