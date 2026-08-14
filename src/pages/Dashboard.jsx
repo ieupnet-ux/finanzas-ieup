@@ -9,6 +9,7 @@ import Usuarios from './Usuarios';
 import Auditoria from './Auditoria';
 import Configuracion from './Configuracion';
 import Eventos from './Eventos';
+import Prestamos from './Prestamos';
 import { Menu } from 'lucide-react';
 
 export default function Dashboard({ usuario, isOnline, onLogout }) {
@@ -28,6 +29,7 @@ export default function Dashboard({ usuario, isOnline, onLogout }) {
     finanzas: 'Finanzas',
     reportes: 'Reportes',
     eventos: 'Eventos',
+    prestamos: 'Préstamos',
     usuarios: 'Usuarios',
     auditoria: 'Auditoría',
     configuracion: 'Configuración',
@@ -43,6 +45,7 @@ export default function Dashboard({ usuario, isOnline, onLogout }) {
       case 'usuarios':      return <Usuarios usuario={usuario} />;
       case 'auditoria':     return <Auditoria usuario={usuario} />;
       case 'eventos':       return <Eventos usuario={usuario} />;
+      case 'prestamos':     return <Prestamos usuario={usuario} />;
       case 'configuracion': return <Configuracion usuario={usuario} />;
       default:              return <DashboardHome usuario={usuario} />;
     }
