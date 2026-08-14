@@ -1,11 +1,11 @@
-import { LogOut, Home, TrendingDown, DollarSign, Wallet, BarChart3, Users, AlertCircle, Settings, UserCircle, X, CalendarDays } from 'lucide-react';
+import { LogOut, Home, TrendingDown, DollarSign, Wallet, BarChart3, Users, AlertCircle, Settings, UserCircle, X, CalendarDays, Banknote } from 'lucide-react';
 
 // Definición de permisos por rol para el menú
 const PERMISOS_MENU = {
-  admin:    ['dashboard', 'ingresos', 'egresos', 'finanzas', 'reportes', 'eventos', 'usuarios', 'auditoria', 'configuracion'],
-  tesorero: ['dashboard', 'ingresos', 'egresos', 'finanzas', 'reportes', 'eventos'],
-  auditor:  ['dashboard', 'finanzas', 'reportes', 'auditoria'],
-  operador: ['dashboard', 'ingresos', 'egresos', 'reportes'],
+  admin:    ['dashboard', 'ingresos', 'egresos', 'finanzas', 'reportes', 'eventos', 'prestamos', 'usuarios', 'auditoria', 'configuracion'],
+  tesorero: ['dashboard', 'ingresos', 'egresos', 'finanzas', 'reportes', 'eventos', 'prestamos'],
+  auditor:  ['dashboard', 'finanzas', 'reportes', 'prestamos', 'auditoria'],
+  operador: ['dashboard', 'ingresos', 'egresos', 'reportes', 'prestamos'],
 };
 
 const ROLES_LABEL = {
@@ -33,6 +33,7 @@ export default function Sidebar({ usuario, activePage, onNavigate, onLogout, abi
     { id: 'finanzas', label: 'Finanzas', icon: Wallet },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     { id: 'eventos', label: 'Eventos', icon: CalendarDays },
+    { id: 'prestamos', label: 'Préstamos', icon: Banknote },
     { id: 'usuarios', label: 'Usuarios', icon: Users },
     { id: 'auditoria', label: 'Auditoría', icon: AlertCircle },
     { id: 'configuracion', label: 'Configuración', icon: Settings },
