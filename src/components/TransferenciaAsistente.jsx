@@ -80,7 +80,8 @@ export default function TransferenciaAsistente({ abierto, onCerrar, onCreado, us
 
   const monto = parseFloat(form.monto) || 0;
   const valido = form.fecha && monto > 0 && form.caja_origen && form.caja_destino &&
-    form.templo_origen && form.templo_destino && form.caja_origen !== form.caja_destino && concepto !== null;
+    form.templo_origen && form.templo_destino &&
+    !(form.caja_origen === form.caja_destino && form.templo_origen === form.templo_destino) && concepto !== null;
 
   const guardar = async () => {
     if (!valido) return;
@@ -185,7 +186,8 @@ export default function TransferenciaAsistente({ abierto, onCerrar, onCreado, us
               </div>
             )}
 
-            {form.caja_origen && form.caja_destino && form.caja_origen === form.caja_destino && (
+            {form.caja_origen && form.caja_destino && form.templo_origen && form.templo_destino &&
+              form.caja_origen === form.caja_destino && form.templo_origen === form.templo_destino && (
               <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-200 rounded p-2">
                 <AlertCircle size={16} /> La caja de origen y destino no pueden ser la misma.
               </div>
