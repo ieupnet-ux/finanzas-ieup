@@ -2,6 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { ArrowRight, RefreshCw, Check, X, AlertCircle } from 'lucide-react';
 
+// Fecha actual en zona horaria Argentina (evita el bug de UTC a partir de las 21hs)
+const hoyAR = () => {
+  const now = new Date();
+  return now.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+};
+
+
 const detectarConcepto = (cajaOrigenGrupo, cajaDestinoGrupo, cajaOrigenValor, cajaDestinoValor) => {
   const esPF = (v) => v && v.endsWith('-pf');
   if (cajaOrigenGrupo === 'cajas' && cajaDestinoGrupo === 'cajas') return 'Transferencia entre Cajas';
@@ -39,7 +46,7 @@ export default function TransferenciaAsistente({ abierto, onCerrar, onCreado, us
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = hoyAR();
   const [form, setForm] = useState({ fecha: hoy, monto: '', detalle: '', templo_origen: '', caja_origen: '', templo_destino: '', caja_destino: '' });
 
   useEffect(() => {
