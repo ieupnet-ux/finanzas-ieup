@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import Papa from 'papaparse';
+
+// Fecha actual en zona horaria Argentina (evita el bug de UTC a partir de las 21hs)
+const hoyAR = () => {
+  const now = new Date();
+  return now.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+};
+
 import {
   Plus, X, Save, ChevronDown, ChevronUp, FileText,
   DollarSign, AlertCircle, CheckCircle, Clock, RefreshCw,
@@ -62,7 +69,7 @@ export default function Prestamos({ usuario }) {
     deudor_templo_id: '',
     monto_original: '',
     moneda: 'ARS',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: hoyAR(),
     descripcion: '',
   };
   const [form, setForm] = useState(formVacio);
@@ -73,7 +80,7 @@ export default function Prestamos({ usuario }) {
     monto_capital: '',
     monto_interes: '',
     moneda: 'ARS',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: hoyAR(),
     indice_inflacion: '',
     periodo_meses: '',
     notas: '',
@@ -345,7 +352,7 @@ export default function Prestamos({ usuario }) {
     });
     const blob = new Blob(['\ufeff' + Papa.unparse(data)], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = `prestamos-${new Date().toISOString().split('T')[0]}.csv`; a.click();
+    a.download = `prestamos-${hoyAR()}.csv`; a.click();
   };
 
   if (loading) return <div className="flex items-center justify-center py-24"><div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin" /></div>;
