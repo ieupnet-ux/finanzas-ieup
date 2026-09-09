@@ -40,6 +40,13 @@ async function fetchTodosMovimientos(tipo = null) {
 import { Download, Plus, Settings, Edit2, Trash2, X, Upload, Filter } from 'lucide-react';
 import Papa from 'papaparse';
 
+// Fecha actual en zona horaria Argentina (evita el bug de UTC a partir de las 21hs)
+const hoyAR = () => {
+  const now = new Date();
+  return now.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+};
+
+
 
 const PERIODOS_FILTRO = [
   { value: 'todo', label: 'Todo' },
@@ -128,7 +135,7 @@ export default function Egresos() {
     evento_id: '',
     ubicacion: 'general',
     detalle: '',
-    fecha: new Date().toISOString().split('T')[0]
+    fecha: hoyAR()
   });
 
   const monedas = [
@@ -238,7 +245,7 @@ export default function Egresos() {
       monto: '', concepto: '', templo: '', moneda: 'ARS', 
       tipo_transaccion: 'efectivo',
     evento_id: '', ubicacion: 'general', 
-      detalle: '', fecha: new Date().toISOString().split('T')[0] 
+      detalle: '', fecha: hoyAR() 
     });
     setShowForm(false);
     loadData();
@@ -357,7 +364,7 @@ export default function Egresos() {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `egresos-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `egresos-${hoyAR()}.csv`;
     link.click();
   };
 
@@ -548,7 +555,7 @@ export default function Egresos() {
                 monto: '', concepto: '', templo: '', moneda: 'ARS', 
                 tipo_transaccion: 'efectivo',
     evento_id: '', ubicacion: 'general', 
-                detalle: '', fecha: new Date().toISOString().split('T')[0] 
+                detalle: '', fecha: hoyAR() 
               });
             }}
             className="btn-primary flex items-center gap-2"
