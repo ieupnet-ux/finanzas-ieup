@@ -4,6 +4,13 @@ import Papa from 'papaparse';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, PlusCircle, Edit3, Trash2, FileText, ChevronDown, ChevronUp, Plus, X, ClipboardCheck } from 'lucide-react';
 
+// Fecha actual en zona horaria Argentina (evita el bug de UTC a partir de las 21hs)
+const hoyAR = () => {
+  const now = new Date();
+  return now.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+};
+
+
 // ============ Helpers ============
 const OPERACIONES = {
   INSERT: { label: 'Alta', color: 'bg-green-500' },
@@ -50,7 +57,7 @@ export default function Auditoria({ usuario }) {
   // Revisores
   const [formRevisorAbierto, setFormRevisorAbierto] = useState(false);
   const [nuevoRevisor, setNuevoRevisor] = useState({
-    nombre: '', fecha_revision: new Date().toISOString().split('T')[0], observaciones: '',
+    nombre: '', fecha_revision: hoyAR(), observaciones: '',
   });
 
   useEffect(() => { cargar(); }, []);
@@ -179,7 +186,7 @@ export default function Auditoria({ usuario }) {
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `auditoria-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `auditoria-${hoyAR()}.csv`;
     link.click();
   };
 
@@ -194,7 +201,7 @@ export default function Auditoria({ usuario }) {
       discrepancias_encontradas: false,
     });
     if (error) { alert('Error: ' + error.message); return; }
-    setNuevoRevisor({ nombre: '', fecha_revision: new Date().toISOString().split('T')[0], observaciones: '' });
+    setNuevoRevisor({ nombre: '', fecha_revision: hoyAR(), observaciones: '' });
     setFormRevisorAbierto(false);
     cargar();
   };
