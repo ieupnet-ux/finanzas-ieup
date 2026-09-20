@@ -7,7 +7,11 @@ import { Calendar, ChevronLeft, Plus, Edit2, Save, X, TrendingUp, TrendingDown, 
 const COLORS = ['#FFD700','#001F3F','#4CAF50','#F44336','#9C27B0','#FF9800','#2196F3','#795548'];
 const fmt = (n) => `$ ${Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const fmtC = (n) => { if(Math.abs(n)>=1000000) return `$${(n/1000000).toFixed(1)}M`; if(Math.abs(n)>=1000) return `$${(n/1000).toFixed(0)}k`; return `$${n}`; };
-const fmtF = (s) => s ? new Date(s+'T00:00:00').toLocaleDateString('es-AR') : '—';
+const fmtF = (s) => {
+  if (!s) return '—';
+  const [y, m, d] = String(s).split('T')[0].split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('es-AR');
+};
 
 const Tarjeta = ({titulo,monto,icono:Icon,color}) => (
   <div className={`card bg-gradient-to-br ${color} text-white`}>
@@ -100,7 +104,7 @@ export default function Eventos({ usuario }) {
 
   const exportarCSV = () => {
     const data = movsEvento.map(m => ({
-      Fecha: new Date(m.fecha+'T00:00:00').toLocaleDateString('es-AR'),
+      Fecha: fmtF(m.fecha),
       Tipo: m.tipo, Concepto: m.concepto, Monto: m.monto, Moneda: m.moneda,
       Templo: templos.find(t=>t.id===m.templo_id)?.nombre||'—',
       Caja: m.ubicacion, Detalle: m.detalle||'—',
