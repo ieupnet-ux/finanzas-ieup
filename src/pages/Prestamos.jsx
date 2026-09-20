@@ -20,7 +20,11 @@ const SIMBOLOS = { ARS: '$', USD: 'U$S', CLP: 'CLP$' };
 const fmt = (n, moneda = 'ARS') =>
   `${SIMBOLOS[moneda] || '$'} ${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const fmtF = (s) => s ? new Date(s + 'T00:00:00').toLocaleDateString('es-AR') : '—';
+const fmtF = (s) => {
+  if (!s) return '—';
+  const [y, m, d] = String(s).split('T')[0].split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('es-AR');
+};
 
 const ESTADOS = {
   pendiente: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
