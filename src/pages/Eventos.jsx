@@ -26,6 +26,7 @@ export default function Eventos({ usuario }) {
   const [eventos, setEventos] = useState([]);
   const [movimientos, setMovimientos] = useState([]);
   const [templos, setTemplos] = useState([]);
+  const [cajas, setCajas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [eventoActivo, setEventoActivo] = useState(null);
   const [mensaje, setMensaje] = useState('');
@@ -39,14 +40,16 @@ export default function Eventos({ usuario }) {
 
   const cargar = async () => {
     setLoading(true);
-    const [evRes, movRes, tempRes] = await Promise.all([
+    const [evRes, movRes, tempRes, cajasRes] = await Promise.all([
       supabase.from('eventos').select('*').order('fecha_inicio', { ascending: false }),
       supabase.from('movimientos').select('*').not('evento_id','is',null),
       supabase.from('templos').select('*').order('nombre'),
+      supabase.from('cajas').select('*').eq('activo', true),
     ]);
     setEventos(evRes.data || []);
     setMovimientos(movRes.data || []);
     setTemplos(tempRes.data || []);
+    setCajas(cajasRes.data || []);
     setLoading(false);
   };
 
@@ -82,6 +85,34 @@ export default function Eventos({ usuario }) {
     });
     return Object.values(g).sort((a,b)=>(b.ingresos+b.egresos)-(a.ingresos+a.egresos));
   }, [movsEvento, templos]);
+
+  // Datos por Templo+Caja para la tabla resumen
+  const porTemploCaja = useMemo(() => {
+    const g = {};
+    movsEvento.forEach(m => {
+      const t = templos.find(x=>x.id===m.templo_id)?.nombre || 'Sin templo';
+      const caja = cajas.find(x=>x.valor===m.ubicacion)?.nombre || m.ubicacion || 'General';
+      const key = `${t}||${caja}`;
+      if (!g[key]) g[key] = {templo:t, caja, ingresos:0, egresos:0};
+      if (m.tipo==='ingreso') g[key].ingresos+=m.monto; else g[key].egresos+=m.monto;
+    });
+    return Object.values(g).sort((a,b)=>a.templo.localeCompare(b.templo)||a.caja.localeCompare(b.caja));
+  }, [movsEvento, templos, cajas]);
+
+  const [vistaGrafico, setVistaGrafico] = useState('templo'); // 'templo' | 'caja'
+
+  // Datos para el gráfico según la vista seleccionada
+  const datosGrafico = useMemo(() => {
+    if (vistaGrafico === 'templo') return porTemplo;
+    // Agrupar por caja
+    const g = {};
+    movsEvento.forEach(m => {
+      const caja = cajas.find(x=>x.valor===m.ubicacion)?.nombre || m.ubicacion || 'General';
+      if (!g[caja]) g[caja] = {templo: caja, ingresos:0, egresos:0};
+      if (m.tipo==='ingreso') g[caja].ingresos+=m.monto; else g[caja].egresos+=m.monto;
+    });
+    return Object.values(g).sort((a,b)=>(b.ingresos+b.egresos)-(a.ingresos+a.egresos));
+  }, [vistaGrafico, porTemplo, movsEvento, cajas]);
 
   const egresosConcepto = useMemo(() => {
     const g = {};
@@ -148,18 +179,66 @@ export default function Eventos({ usuario }) {
         </div>
       ) : (<>
         <div className="card">
-          <h2 className="text-xl font-bold text-navy mb-4">Ingresos y Egresos por Templo</h2>
-          <ResponsiveContainer width="100%" height={Math.max(260,porTemplo.length*50)}>
-            <BarChart data={porTemplo} layout="vertical" margin={{left:10,right:20}}>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 className="text-xl font-bold text-navy">Ingresos y Egresos</h2>
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              {[{id:'templo',label:'Por Templo'},{id:'caja',label:'Por Caja'}].map(v=>(
+                <button key={v.id} onClick={()=>setVistaGrafico(v.id)}
+                  className={`px-3 py-1 rounded text-xs font-bold transition ${vistaGrafico===v.id?'bg-navy text-white':'text-gray-600 hover:bg-gray-200'}`}>
+                  {v.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={Math.max(260,datosGrafico.length*50)}>
+            <BarChart data={datosGrafico} layout="vertical" margin={{left:10,right:20}}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis type="number" tickFormatter={fmtC} tick={{fontSize:11}} />
-              <YAxis type="category" dataKey="templo" width={110} tick={{fontSize:11}} />
+              <YAxis type="category" dataKey="templo" width={130} tick={{fontSize:11}} />
               <Tooltip formatter={v=>fmt(v)} />
               <Legend />
               <Bar dataKey="ingresos" name="Ingresos" fill="#4CAF50" radius={[0,4,4,0]} />
               <Bar dataKey="egresos" name="Egresos" fill="#F44336" radius={[0,4,4,0]} />
             </BarChart>
           </ResponsiveContainer>
+
+          {/* Tabla resumen Templo × Caja */}
+          <div className="mt-6">
+            <h3 className="text-sm font-bold text-navy mb-2">Detalle por Templo y Caja</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b-2 border-gold">
+                    <th className="text-left p-2 text-navy font-bold">Templo</th>
+                    <th className="text-left p-2 text-navy font-bold">Caja</th>
+                    <th className="text-right p-2 text-navy font-bold">Ingresos</th>
+                    <th className="text-right p-2 text-navy font-bold">Egresos</th>
+                    <th className="text-right p-2 text-navy font-bold">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {porTemploCaja.map((r,i)=>{
+                    const saldoFila = r.ingresos - r.egresos;
+                    return (
+                      <tr key={i} className={`border-b ${i%2===1?'bg-gray-50':''}`}>
+                        <td className="p-2 font-medium">{r.templo}</td>
+                        <td className="p-2 text-gray-600">{r.caja}</td>
+                        <td className="p-2 text-right text-green-700 font-mono">{r.ingresos>0?fmt(r.ingresos):'—'}</td>
+                        <td className="p-2 text-right text-red-700 font-mono">{r.egresos>0?fmt(r.egresos):'—'}</td>
+                        <td className={`p-2 text-right font-mono font-bold ${saldoFila>=0?'text-navy':'text-orange-700'}`}>{fmt(saldoFila)}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="border-t-2 border-navy bg-gray-100 font-bold text-xs">
+                    <td colSpan={2} className="p-2 text-navy">TOTAL</td>
+                    <td className="p-2 text-right text-green-700 font-mono">{fmt(totalIng)}</td>
+                    <td className="p-2 text-right text-red-700 font-mono">{fmt(totalEgr)}</td>
+                    <td className={`p-2 text-right font-mono ${saldo>=0?'text-navy':'text-orange-700'}`}>{fmt(saldo)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -192,7 +271,7 @@ export default function Eventos({ usuario }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b-2 border-gold">
-                  {['Fecha','Tipo','Concepto','Monto','Templo','Detalle'].map(h=><th key={h} className={`p-2 text-navy font-bold ${h==='Monto'?'text-right':'text-left'}`}>{h}</th>)}
+                  {['Fecha','Tipo','Concepto','Monto','Templo','Caja','Detalle'].map(h=><th key={h} className={`p-2 text-navy font-bold ${h==='Monto'?'text-right':'text-left'}`}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -203,6 +282,7 @@ export default function Eventos({ usuario }) {
                     <td className="p-2 text-xs">{m.concepto}</td>
                     <td className={`p-2 text-right font-mono text-sm font-bold ${m.tipo==='ingreso'?'text-green-700':'text-red-700'}`}>{m.tipo==='egreso'?'-':''}{fmt(m.monto)}</td>
                     <td className="p-2 text-xs">{templos.find(t=>t.id===m.templo_id)?.nombre||'—'}</td>
+                    <td className="p-2 text-xs text-gray-500">{cajas.find(c=>c.valor===m.ubicacion)?.nombre||m.ubicacion||'—'}</td>
                     <td className="p-2 text-xs text-gray-600 max-w-xs truncate">{m.detalle||'—'}</td>
                   </tr>
                 ))}
