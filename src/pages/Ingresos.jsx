@@ -832,7 +832,16 @@ export default function Ingresos() {
                     </td>
                     <td className="p-3 text-xs">{ubicaciones.find(u => u.value === ing.ubicacion)?.label || '—'}</td>
                     <td className="p-3 text-xs">{ing.templo_id ? templos.find(t => t.id === ing.templo_id)?.nombre || '—' : '—'}</td>
-                    <td className="p-3 text-gray-600">{ing.detalle || '—'}</td>
+                    <td className="p-3 text-gray-600">
+                      <div className="space-y-1">
+                        <span>{ing.detalle || '—'}</span>
+                        {ing.evento_id && eventosBD.find(e => e.id === ing.evento_id) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-gold bg-opacity-20 text-yellow-800 border border-yellow-300">
+                            🎪 {eventosBD.find(e => e.id === ing.evento_id)?.nombre}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="p-3 flex gap-2">
                       <button
                         onClick={() => handleEditIngreso(ing)}
