@@ -11,6 +11,7 @@ async function fetchTodosMovimientos(tipo = null) {
       .from('movimientos')
       .select('*')
       .order('fecha', { ascending: true })
+      .order('id', { ascending: true })
       .range(from, from + LOTE - 1);
     if (tipo) q = q.eq('tipo', tipo);
     const { data, error } = await q;
