@@ -27,14 +27,16 @@ const UBICACIONES = [
   { value: 'otro', label: 'Otro' },
 ];
 
+// Mismos conceptos internos que usa DashboardHome
 const CONCEPTOS_INTERNOS = new Set([
-  'Saldo Inicial',
   'Transferencia entre Cajas',
-  'Préstamo entre Cajas',
-  'Devolución de Préstamo',
+  'Depósito Bancario',
   'Extracción Bancaria',
+  'Movimiento entre Cuentas',
+  'Constitución de Plazo Fijo',
+  'Cierre de Plazo Fijo',
   'Aporte a Fondo Común',
-  'Cambio Monetario',
+  'Ajuste de Saldo',
 ]);
 
 function parseFechaLocal(fecha) {
@@ -102,7 +104,7 @@ export default function InformePublico() {
   const [movimientos, setMovimientos] = useState([]);
   const [templos, setTemplos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [periodo, setPeriodo] = useState('este-anio');
+  const [periodo, setPeriodo] = useState('todo');
   const [temploFiltro, setTemploFiltro] = useState('');
 
   useEffect(() => {
