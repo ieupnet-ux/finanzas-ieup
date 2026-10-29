@@ -28,9 +28,13 @@ const UBICACIONES = [
 ];
 
 const CONCEPTOS_INTERNOS = new Set([
-  'Transferencia entre Cajas', 'Depósito Bancario', 'Extracción Bancaria',
-  'Movimiento entre Cuentas', 'Constitución de Plazo Fijo', 'Cierre de Plazo Fijo',
-  'Aporte a Fondo Común', 'Ajuste de Saldo',
+  'Saldo Inicial',
+  'Transferencia entre Cajas',
+  'Préstamo entre Cajas',
+  'Devolución de Préstamo',
+  'Extracción Bancaria',
+  'Aporte a Fondo Común',
+  'Cambio Monetario',
 ]);
 
 function parseFechaLocal(fecha) {
@@ -118,8 +122,7 @@ export default function InformePublico() {
     const [ini, fin] = rangoPeriodo(periodo);
     const grupos = {};
     movimientos.forEach(m => {
-      if (CONCEPTOS_INTERNOS.has(m.concepto)) return;
-      if ((m.concepto || '').trim().toLowerCase() === 'saldo inicial') return;
+      if (CONCEPTOS_INTERNOS.has((m.concepto || '').trim())) return;
       const f = parseFechaLocal(m.fecha);
       if (f < ini || f > fin) return;
       if (temploFiltro && m.templo_id !== temploFiltro) return;
