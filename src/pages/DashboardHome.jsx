@@ -370,8 +370,13 @@ export default function DashboardHome() {
 
   const totalGeneral = useMemo(() => {
     let ingresos = 0, egresos = 0;
-    resumenTemploCaja.forEach(g => { ingresos += g.ingresos; egresos += g.egresos; });
-    return { ingresos, egresos, saldo: ingresos - egresos };
+    let cajasUnicas = new Set();
+    resumenTemploCaja.forEach(g => {
+      ingresos += g.ingresos;
+      egresos += g.egresos;
+      g.cajasArr.forEach(cj => cajasUnicas.add(g.templo + '|' + cj.caja));
+    });
+    return { ingresos, egresos, saldo: ingresos - egresos, templos: resumenTemploCaja.length, cajas: cajasUnicas.size };
   }, [resumenTemploCaja]);
 
   const exportarResumenTemploCaja = () => {
@@ -647,6 +652,10 @@ export default function DashboardHome() {
           <div className="card">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <h2 className="text-xl font-bold text-navy">Resumen de Saldos por Templo y Caja</h2>
+              <div className="flex gap-3 text-sm text-gray-600">
+                <span className="bg-navy text-white px-2 py-1 rounded font-bold">{totalGeneral.templos} templo{totalGeneral.templos !== 1 ? 's' : ''}</span>
+                <span className="bg-gold text-navy px-2 py-1 rounded font-bold">{totalGeneral.cajas} caja{totalGeneral.cajas !== 1 ? 's' : ''}</span>
+              </div>
               <button onClick={exportarResumenTemploCaja} className="btn-primary flex items-center gap-2">
                 <Download size={18} /> Exportar CSV
               </button>
@@ -656,6 +665,7 @@ export default function DashboardHome() {
                 <thead>
                   <tr className="border-b-2 border-gold">
                     <th className="text-left p-3 text-navy font-bold">Templo / Caja</th>
+                    <th className="text-center p-3 text-navy font-bold">Cajas</th>
                     <th className="text-right p-3 text-navy font-bold">Ingresos</th>
                     <th className="text-right p-3 text-navy font-bold">Egresos</th>
                     <th className="text-right p-3 text-navy font-bold">Saldo</th>
@@ -667,6 +677,7 @@ export default function DashboardHome() {
                   ))}
                   <tr className="bg-navy text-white font-bold">
                     <td className="p-3">TOTAL GENERAL</td>
+                    <td className="p-3 text-center text-gold">{totalGeneral.cajas} cajas</td>
                     <td className="p-3 text-right">{fmt(totalGeneral.ingresos)}</td>
                     <td className="p-3 text-right">{fmt(totalGeneral.egresos)}</td>
                     <td className="p-3 text-right">{fmt(totalGeneral.saldo)}</td>
@@ -775,6 +786,9 @@ function FragmentoTemplo({ grupo, fmt }) {
     <>
       <tr className="bg-gold bg-opacity-20 font-bold">
         <td className="p-3 text-navy">{grupo.templo}</td>
+        <td className="p-3 text-center">
+          <span className="bg-navy text-white text-xs px-2 py-0.5 rounded-full">{grupo.cajasArr.length}</span>
+        </td>
         <td className="p-3 text-right text-green-700">{fmt(grupo.ingresos)}</td>
         <td className="p-3 text-right text-red-600">{fmt(grupo.egresos)}</td>
         <td className={`p-3 text-right ${grupo.saldo >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(grupo.saldo)}</td>
@@ -782,6 +796,7 @@ function FragmentoTemplo({ grupo, fmt }) {
       {grupo.cajasArr.map((cj) => (
         <tr key={cj.caja} className="border-b hover:bg-gray-50">
           <td className="p-3 pl-8 text-gray-700">↳ {cj.caja}</td>
+          <td className="p-3"></td>
           <td className="p-3 text-right text-green-700">{fmt(cj.ingresos)}</td>
           <td className="p-3 text-right text-red-600">{fmt(cj.egresos)}</td>
           <td className={`p-3 text-right font-bold ${cj.saldo >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(cj.saldo)}</td>
