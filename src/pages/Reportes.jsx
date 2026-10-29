@@ -130,11 +130,7 @@ export default function Reportes() {
         fetchTodosMovimientos(),
         supabase.from('templos').select('*'),
         fetchCajas(),
-supabase.from('auditoria')
-          .select('id_registro, usuario_id, tipo_operacion')
-          .eq('tabla_afectada', 'movimientos')
-          .order('fecha', { ascending: true }),
-        supabase.from('usuarios').select('id, nombre'),
+        supabase.rpc('get_usuarios_movimientos'),
       ]);
       setMovimientos(movs.reverse());
       setTemplos(tempRes.data || []);
