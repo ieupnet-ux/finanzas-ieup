@@ -252,7 +252,7 @@ export default function Auditoria({ usuario }) {
               <option value="7d">Últimos 7 días</option>
               <option value="30d">Últimos 30 días</option>
               <option value="90d">Últimos 90 días</option>
-              <option value="todo">Todo (últimos 500 registros)</option>
+              <option value="todo">Todo (últimos 2000 registros)</option>
             </select>
           </div>
           <div>
