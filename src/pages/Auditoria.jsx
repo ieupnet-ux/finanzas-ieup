@@ -69,7 +69,7 @@ export default function Auditoria({ usuario }) {
       supabase.from('usuarios').select('id, email, nombre'),
       supabase.from('templos').select('id, nombre'),
       supabase.from('cajas').select('valor, nombre'),
-      supabase.from('revisores_cuenta').select('*').order('fecha_revision', { ascending: false }),
+      supabase.from('revisiones_cuenta').select('*').order('fecha_revision', { ascending: false }),
     ]);
     setLogs(logsRes.data || []);
     setUsuarios(usuariosRes.data || []);
@@ -183,7 +183,7 @@ export default function Auditoria({ usuario }) {
       Resumen: resumenCambio(l),
     }));
     const csv = Papa.unparse(data);
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `auditoria-${hoyAR()}.csv`;
@@ -194,7 +194,7 @@ export default function Auditoria({ usuario }) {
   const agregarRevisor = async (e) => {
     e.preventDefault();
     if (!nuevoRevisor.nombre.trim()) return;
-    const { error } = await supabase.from('revisores_cuenta').insert({
+    const { error } = await supabase.from('revisiones_cuenta').insert({
       nombre: nuevoRevisor.nombre.trim(),
       fecha_revision: nuevoRevisor.fecha_revision,
       observaciones: nuevoRevisor.observaciones.trim() || null,
@@ -207,7 +207,7 @@ export default function Auditoria({ usuario }) {
   };
 
   const toggleDiscrepancia = async (r) => {
-    await supabase.from('revisores_cuenta')
+    await supabase.from('revisiones_cuenta')
       .update({ discrepancias_encontradas: !r.discrepancias_encontradas })
       .eq('id', r.id);
     cargar();
@@ -215,7 +215,7 @@ export default function Auditoria({ usuario }) {
 
   const eliminarRevision = async (id) => {
     if (!confirm('¿Eliminar este registro de revisión?')) return;
-    await supabase.from('revisores_cuenta').delete().eq('id', id);
+    await supabase.from('revisiones_cuenta').delete().eq('id', id);
     cargar();
   };
 
@@ -426,7 +426,7 @@ export default function Auditoria({ usuario }) {
         )}
       </div>
 
-      {/* REVISIONES DE CUENTAS (simplificado) */}
+      {/* REVISIONES DE CUENTAS */}
       <div className="card border-l-4 border-purple-600">
         <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
           <div className="flex items-center gap-2">
