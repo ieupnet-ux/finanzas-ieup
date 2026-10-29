@@ -269,6 +269,20 @@ export default function Auditoria({ usuario }) {
               <option value="DELETE">Eliminaciones</option>
             </select>
           </div>
+          <div>
+            <label className="block text-xs font-bold text-navy mb-1">Templo</label>
+            <select value={temploFiltro} onChange={(e) => setTemploFiltro(e.target.value)} className="input-field w-full">
+              <option value="">Todos</option>
+              {templos.map(t => <option key={t.id} value={String(t.id)}>{t.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-navy mb-1">Caja</label>
+            <select value={cajaFiltro} onChange={(e) => setCajaFiltro(e.target.value)} className="input-field w-full">
+              <option value="">Todas</option>
+              {cajas.map(c => <option key={c.valor} value={String(c.valor)}>{c.nombre}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
