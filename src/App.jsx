@@ -3,15 +3,24 @@ import { supabase, offlineQueue } from './services/supabaseClient';
 import Login from './pages/Login';
 import CambiarPassword from './pages/CambiarPassword';
 import Dashboard from './pages/Dashboard';
+import InformePublico from './pages/InformePublico';
 import { Wifi, WifiOff } from 'lucide-react';
+
+// Ruta pública sin login
+const esRutaPublica = () =>
+  window.location.pathname === '/informe-publico' ||
+  window.location.search.includes('informe-publico');
 
 export default function App() {
   const [session, setSession] = useState(null);
   const [usuarioApp, setUsuarioApp] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [loading, setLoading] = useState(true);
+  const rutaPublica = esRutaPublica();
 
   useEffect(() => {
+    // Si es ruta pública no inicializamos nada de sesión
+    if (rutaPublica) return;
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -36,8 +45,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (rutaPublica) return;
     if (isOnline) offlineQueue.syncQueue();
-  }, [isOnline]);
+  }, [isOnline, rutaPublica]);
+
+  // Renderizar informe público antes de cualquier lógica de sesión
+  if (rutaPublica) return <InformePublico />;
 
   const checkSession = async () => {
     try {
