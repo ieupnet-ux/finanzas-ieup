@@ -152,6 +152,9 @@ supabase.from('auditoria')
         }
       });
       setAuditoriaMap(mapa);
+      console.log('auditoria registros:', audRes.data?.length, 'error:', audRes.error?.message);
+      console.log('usuarios:', usersRes.data?.length, 'error:', usersRes.error?.message);
+      console.log('mapa sample:', Object.entries(mapa).slice(0, 3));
     } catch (e) {
       console.error(e);
     } finally {
