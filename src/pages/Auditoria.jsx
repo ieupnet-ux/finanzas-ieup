@@ -50,6 +50,8 @@ export default function Auditoria({ usuario }) {
   const [periodo, setPeriodo] = useState('30d');
   const [usuarioFiltro, setUsuarioFiltro] = useState('');
   const [operacionFiltro, setOperacionFiltro] = useState('');
+  const [temploFiltro, setTemploFiltro] = useState('');
+  const [cajaFiltro, setCajaFiltro] = useState('');
   const [filaAbierta, setFilaAbierta] = useState(null);
   const [pagina, setPagina] = useState(1);
   const POR_PAGINA = 25;
@@ -143,11 +145,19 @@ export default function Auditoria({ usuario }) {
       if (desde && new Date(l.fecha) < desde) return false;
       if (usuarioFiltro && l.usuario_id !== usuarioFiltro) return false;
       if (operacionFiltro && l.tipo_operacion !== operacionFiltro) return false;
+      if (temploFiltro) {
+        const tid = l.datos_nuevos?.templo_id || l.datos_anteriores?.templo_id;
+        if (String(tid) !== temploFiltro) return false;
+      }
+      if (cajaFiltro) {
+        const ub = l.datos_nuevos?.ubicacion || l.datos_anteriores?.ubicacion;
+        if (String(ub) !== cajaFiltro) return false;
+      }
       return true;
     });
   }, [logs, periodo, usuarioFiltro, operacionFiltro]);
 
-  useEffect(() => { setPagina(1); }, [periodo, usuarioFiltro, operacionFiltro]);
+  useEffect(() => { setPagina(1); }, [periodo, usuarioFiltro, operacionFiltro, temploFiltro, cajaFiltro]);
 
   const totalPaginas = Math.max(1, Math.ceil(logsFiltrados.length / POR_PAGINA));
   const logsPagina = logsFiltrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
