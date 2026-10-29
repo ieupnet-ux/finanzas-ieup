@@ -126,7 +126,7 @@ export default function Reportes() {
 
   const loadData = async () => {
     try {
-      const [movs, tempRes, cajasData, audRes, usersRes] = await Promise.all([
+      const [movs, tempRes, cajasData, rpcRes] = await Promise.all([
         fetchTodosMovimientos(),
         supabase.from('templos').select('*'),
         fetchCajas(),
@@ -139,17 +139,10 @@ supabase.from('auditoria')
       setMovimientos(movs.reverse());
       setTemplos(tempRes.data || []);
       setCajas(cajasData);
-      // Construir mapa id_registro → nombre de usuario (priorizar INSERT, luego UPDATE más reciente)
-      const usersById = {};
-      (usersRes.data || []).forEach(u => { usersById[u.id] = u.nombre; });
+      // Construir mapa movimiento_id → nombre de usuario desde RPC
       const mapa = {};
-      (audRes.data || []).forEach(log => {
-        const id = log.id_registro;
-        if (!id) return;
-        const nombre = usersById[log.usuario_id] || '—';
-        if (!mapa[id] || log.tipo_operacion === 'INSERT') {
-          mapa[id] = nombre;
-        }
+      (rpcRes.data || []).forEach(row => {
+        if (row.movimiento_id) mapa[row.movimiento_id] = row.nombre_usuario;
       });
       setAuditoriaMap(mapa);
     } catch (e) {
