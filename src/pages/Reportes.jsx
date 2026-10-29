@@ -126,24 +126,27 @@ export default function Reportes() {
 
   const loadData = async () => {
     try {
-      const [movs, tempRes, cajasData, audRes] = await Promise.all([
+      const [movs, tempRes, cajasData, audRes, usersRes] = await Promise.all([
         fetchTodosMovimientos(),
         supabase.from('templos').select('*'),
         fetchCajas(),
-        supabase.from('auditoria')
-          .select('registro_id, usuario_id, tipo_operacion, usuarios(nombre)')
+supabase.from('auditoria')
+          .select('id_registro, usuario_id, tipo_operacion')
           .eq('tabla_afectada', 'movimientos')
           .order('fecha', { ascending: true }),
+        supabase.from('usuarios').select('id, nombre'),
       ]);
       setMovimientos(movs.reverse());
       setTemplos(tempRes.data || []);
       setCajas(cajasData);
-      // Construir mapa registro_id → nombre de usuario (priorizar INSERT, luego UPDATE más reciente)
+      // Construir mapa id_registro → nombre de usuario (priorizar INSERT, luego UPDATE más reciente)
+      const usersById = {};
+      (usersRes.data || []).forEach(u => { usersById[u.id] = u.nombre; });
       const mapa = {};
       (audRes.data || []).forEach(log => {
-        const id = log.registro_id;
+        const id = log.id_registro;
         if (!id) return;
-        const nombre = log.usuarios?.nombre || '—';
+        const nombre = usersById[log.usuario_id] || '—';
         if (!mapa[id] || log.tipo_operacion === 'INSERT') {
           mapa[id] = nombre;
         }
