@@ -140,6 +140,7 @@ export default function Auditoria({ usuario }) {
     if (periodo === 'hoy') { desde = new Date(ahora); desde.setHours(0, 0, 0, 0); }
     if (periodo === '7d') { desde = new Date(ahora); desde.setDate(desde.getDate() - 7); }
     if (periodo === '30d') { desde = new Date(ahora); desde.setDate(desde.getDate() - 30); }
+    if (periodo === '90d') { desde = new Date(ahora); desde.setDate(desde.getDate() - 90); }
 
     return logs.filter(l => {
       if (desde && new Date(l.fecha) < desde) return false;
@@ -250,6 +251,7 @@ export default function Auditoria({ usuario }) {
               <option value="hoy">Hoy</option>
               <option value="7d">Últimos 7 días</option>
               <option value="30d">Últimos 30 días</option>
+              <option value="90d">Últimos 90 días</option>
               <option value="todo">Todo (últimos 500 registros)</option>
             </select>
           </div>
