@@ -67,7 +67,7 @@ export default function Auditoria({ usuario }) {
   const cargar = async () => {
     setLoading(true);
     const [logsRes, usuariosRes, templosRes, cajasRes, revisoresRes] = await Promise.all([
-      supabase.from('auditoria').select('*').order('fecha', { ascending: false }).limit(500),
+      supabase.from('auditoria').select('*').order('fecha', { ascending: false }).limit(2000),
       supabase.from('usuarios').select('id, email, nombre'),
       supabase.from('templos').select('id, nombre'),
       supabase.from('cajas').select('valor, nombre'),
