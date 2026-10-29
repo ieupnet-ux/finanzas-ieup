@@ -66,14 +66,28 @@ export default function Auditoria({ usuario }) {
 
   const cargar = async () => {
     setLoading(true);
-    const [logsRes, usuariosRes, templosRes, cajasRes, revisoresRes] = await Promise.all([
-      supabase.from('auditoria').select('*').order('fecha', { ascending: false }).limit(2000),
+
+    // Traer logs en lotes de 1000 (Supabase limita a 1000 por query)
+    let todosLogs = [];
+    for (let i = 0; i < 6; i++) {
+      const { data } = await supabase
+        .from('auditoria')
+        .select('*')
+        .order('fecha', { ascending: false })
+        .range(i * 1000, (i + 1) * 1000 - 1);
+      if (!data || data.length === 0) break;
+      todosLogs = todosLogs.concat(data);
+      if (data.length < 1000) break;
+    }
+
+    const [usuariosRes, templosRes, cajasRes, revisoresRes] = await Promise.all([
       supabase.from('usuarios').select('id, email, nombre'),
       supabase.from('templos').select('id, nombre'),
       supabase.from('cajas').select('valor, nombre'),
       supabase.from('revisiones_cuenta').select('*').order('fecha_revision', { ascending: false }),
     ]);
-    setLogs(logsRes.data || []);
+
+    setLogs(todosLogs);
     setUsuarios(usuariosRes.data || []);
     setTemplos(templosRes.data || []);
     setCajas(cajasRes.data || []);
@@ -252,7 +266,7 @@ export default function Auditoria({ usuario }) {
               <option value="7d">Últimos 7 días</option>
               <option value="30d">Últimos 30 días</option>
               <option value="90d">Últimos 90 días</option>
-              <option value="todo">Todo (últimos 2000 registros)</option>
+              <option value="todo">Todo (hasta 6.000 registros)</option>
             </select>
           </div>
           <div>
