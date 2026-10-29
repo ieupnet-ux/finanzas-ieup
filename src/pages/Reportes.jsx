@@ -104,7 +104,7 @@ function rangoPeriodo(periodo, desde, hasta) {
 
 export default function Reportes() {
   const [movimientos, setMovimientos] = useState([]);
-  const [usuarios, setUsuarios] = useState([]);
+  const [auditoriaMap, setAuditoriaMap] = useState({});
   const [templos, setTemplos] = useState([]);
   const [cajas, setCajas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -126,16 +126,29 @@ export default function Reportes() {
 
   const loadData = async () => {
     try {
-      const [movs, tempRes, cajasData, usersRes] = await Promise.all([
+      const [movs, tempRes, cajasData, audRes] = await Promise.all([
         fetchTodosMovimientos(),
         supabase.from('templos').select('*'),
         fetchCajas(),
-        supabase.from('usuarios').select('id, nombre'),
+        supabase.from('auditoria')
+          .select('registro_id, usuario_id, tipo_operacion, usuarios(nombre)')
+          .eq('tabla_afectada', 'movimientos')
+          .order('fecha', { ascending: true }),
       ]);
       setMovimientos(movs.reverse());
       setTemplos(tempRes.data || []);
       setCajas(cajasData);
-      setUsuarios(usersRes.data || []);
+      // Construir mapa registro_id → nombre de usuario (priorizar INSERT, luego UPDATE más reciente)
+      const mapa = {};
+      (audRes.data || []).forEach(log => {
+        const id = log.registro_id;
+        if (!id) return;
+        const nombre = log.usuarios?.nombre || '—';
+        if (!mapa[id] || log.tipo_operacion === 'INSERT') {
+          mapa[id] = nombre;
+        }
+      });
+      setAuditoriaMap(mapa);
     } catch (e) {
       console.error(e);
     } finally {
@@ -247,7 +260,7 @@ export default function Reportes() {
     `${SYMBOLS[moneda] || '$'} ${(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const nombreTemplo = (id) => id ? (templos.find(t => t.id === id)?.nombre || '—') : '—';
-  const nombreUsuario = (uid) => uid ? (usuarios.find(u => u.id === uid)?.nombre || '—') : '—';
+  const nombreUsuario = (movId) => auditoriaMap[movId] || '—';
 
   const exportarCSV = () => {
     const data = filtrados.map(m => ({
@@ -452,7 +465,7 @@ export default function Reportes() {
                         <td className="p-3 text-xs">{LABELS[m.ubicacion] || m.ubicacion || '—'}</td>
                         <td className="p-3 text-xs">{nombreTemplo(m.templo_id)}</td>
                         <td className="p-3 text-gray-600 text-xs">{m.detalle || '—'}</td>
-                        <td className="p-3 text-xs text-gray-500">{nombreUsuario(m.usuario_id)}</td>
+                        <td className="p-3 text-xs text-gray-500">{nombreUsuario(m.id)}</td>
                       </tr>
                     ))
                   )}
